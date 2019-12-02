@@ -28,17 +28,32 @@ This repo provides a clean implementation of YoloV3 in TensorFlow 2.0 using all 
 
 ### Installation
 
+#### Conda (Recommended)
+
+```bash
+# Tensorflow CPU
+conda env create -f conda-cpu.yml
+conda activate yolov3-tf2-cpu
+
+# Tensorflow GPU
+conda env create -f conda-gpu.yml
+conda activate yolov3-tf2-gpu
+```
+
 #### Pip
 
 ```bash
 pip install -r requirements.txt
 ```
 
-#### Conda
+### Nvidia Driver (For GPU)
 
 ```bash
-conda env create -f environment.yml
-conda activate yolov3-tf2
+# Ubuntu 18.04
+sudo apt-add-repository -r ppa:graphics-drivers/ppa
+sudo apt install nvidia-driver-430
+# Windows/Other
+https://www.nvidia.com/Download/index.aspx
 ```
 
 ### Convert pre-trained Darknet weights
@@ -67,6 +82,9 @@ python detect_video.py --video 0
 
 # video file
 python detect_video.py --video path_to_file.mp4 --weights ./checkpoints/yolov3-tiny.tf --tiny
+
+# video file with output
+python detect_video.py --video path_to_file.mp4 --output ./output.avi
 ```
 
 ### Training
@@ -129,6 +147,14 @@ Numbers are obtained with rough calculations from `detect_video.py`
 | YoloV3      | 66ms    | 50ms    | 123ms   |
 | YoloV3-Tiny | 15ms    | 10ms    | 24ms    |
 
+### RTX 2070 (credit to @AnaRhisT94)
+
+| Detection   | 416x416 |
+|-------------|---------|
+| YoloV3 predict_on_batch     | 29-32ms    | 
+| YoloV3 predict_on_batch + TensorRT     | 22-28ms    | 
+
+
 Darknet version of YoloV3 at 416x416 takes 29ms on Titan X.
 Considering Titan X has about double the benchmark of Tesla M60,
 Performance-wise this implementation is pretty comparable.
@@ -149,7 +175,8 @@ When calling model(x) directly, we are executing the graph in eager mode. For
 `model.predict`, tf actually compiles the graph on the first run and then
 execute in graph mode. So if you are only running the model once, `model(x)` is
 faster since there is no compilation needed. Otherwise, `model.predict` or
-using exported SavedModel graph is much faster (by 2x).
+using exported SavedModel graph is much faster (by 2x). For non real-time usage,
+`model.predict_on_batch` is even faster as tested by @AnaRhisT94)
 
 ### GradientTape
 
@@ -238,6 +265,23 @@ detect.py:
     (default: '80')
     (an integer)
 
+detect_video.py:
+  --classes: path to classes file
+    (default: './data/coco.names')
+  --video: path to input video (use 0 for cam)
+    (default: './data/video.mp4')
+  --output: path to output video (remember to set right codec for given format. e.g. XVID for .avi)
+    (default: None)
+  --output_format: codec used in VideoWriter when saving video to file
+    (default: 'XVID)
+  --[no]tiny: yolov3 or yolov3-tiny
+    (default: 'false')
+  --weights: path to weights file
+    (default: './checkpoints/yolov3.tf')
+  --num_classes: number of classes in the model
+    (default: '80')
+    (an integer)
+
 train.py:
   --batch_size: batch size
     (default: '8')
@@ -270,6 +314,12 @@ train.py:
   --weights: path to weights file
     (default: './checkpoints/yolov3.tf')
 ```
+
+## Change Log
+
+#### October 1, 2019
+
+- Updated to Tensorflow to v2.0.0 Release
 
 
 ## References

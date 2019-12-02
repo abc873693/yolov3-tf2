@@ -42,6 +42,10 @@ flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
 
 
 def main(_argv):
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    if len(physical_devices) > 0:
+        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
     if FLAGS.tiny:
         model = YoloV3Tiny(FLAGS.size, training=True,
                            classes=FLAGS.num_classes)
@@ -79,7 +83,7 @@ def main(_argv):
             # freeze darknet
             darknet = model.get_layer('yolo_darknet')
             freeze_all(darknet)
-        elif FLAGS.mode == 'frozen':
+        elif FLAGS.transfer == 'frozen':
             # freeze everything
             freeze_all(model)
         else:
