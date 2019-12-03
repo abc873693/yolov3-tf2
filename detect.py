@@ -32,6 +32,7 @@ def main(_argv):
 
     yolo.load_weights(FLAGS.weights)
     logging.info('weights loaded')
+    yolo.summary()
 
     class_names = [c.strip() for c in open(FLAGS.classes).readlines()]
     logging.info('classes loaded')

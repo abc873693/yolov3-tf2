@@ -106,13 +106,16 @@ def draw_outputs(img, outputs, class_names):
     for i in range(nums):
         x1y1 = tuple((np.array(boxes[i][0:2]) * wh).astype(np.int32))
         x2y2 = tuple((np.array(boxes[i][2:4]) * wh).astype(np.int32))
-        rectangleColor = (0xff, 0x2d, 0xff)
-        end = (x1y1[0] + 70, x1y1[1] - 10)
+        rectangleColor = [0, 255, 0]
+        # end = (x1y1[0] + 70, x1y1[1] - 10)
         img = cv2.rectangle(img, x1y1, x2y2, rectangleColor, 1)
-        img = cv2.rectangle(img, x1y1, end, rectangleColor, cv2.FILLED)
-        img = cv2.putText(img, '{} {:.4f}'.format(
-            class_names[int(classes[i])], objectness[i]),
-            x1y1, cv2.FONT_HERSHEY_PLAIN, 0.6, (0, 0, 0), 1)
+        # img = cv2.rectangle(img, x1y1, end, rectangleColor, cv2.FILLED)
+        # img = cv2.putText(img, '{} {:.4f}'.format(
+        #     class_names[int(classes[i])], objectness[i]),
+        #     x1y1, cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 1)
+        cv2.putText(img,'{} {:.4f}'.format(class_names[int(classes[i])], objectness[i]),
+                    x1y1, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                    [0, 255, 0], 2)
     return img
 
 
@@ -136,3 +139,31 @@ def freeze_all(model, frozen=True):
     if isinstance(model, tf.keras.Model):
         for l in model.layers:
             freeze_all(l, frozen)
+
+def compute_iou(rec1, rec2):
+    """
+    computing IoU
+    :param rec1: (y0, x0, y1, x1), which reflects
+            (top, left, bottom, right)
+    :param rec2: (y0, x0, y1, x1)
+    :return: scala value of IoU
+    """
+    # computing area of each rectangles
+    S_rec1 = (rec1[2] - rec1[0]) * (rec1[3] - rec1[1])
+    S_rec2 = (rec2[2] - rec2[0]) * (rec2[3] - rec2[1])
+
+    # computing the sum_area
+    sum_area = S_rec1 + S_rec2
+
+    # find the each edge of intersect rectangle
+    left_line = max(rec1[1], rec2[1])
+    right_line = min(rec1[3], rec2[3])
+    top_line = max(rec1[0], rec2[0])
+    bottom_line = min(rec1[2], rec2[2])
+
+    # judge if there is an intersect
+    if left_line >= right_line or top_line >= bottom_line:
+        return 0
+    else:
+        intersect = (right_line - left_line) * (bottom_line - top_line)
+        return (intersect / (sum_area - intersect))*1.0
