@@ -12,6 +12,8 @@ from __future__ import absolute_import
 
 import os
 import io
+# import pandas as pd
+import tensorflow as tf
 
 from PIL import Image
 # from tensorflow.contrib.object_detection.utils import dataset_util
