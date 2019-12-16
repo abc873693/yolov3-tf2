@@ -3,12 +3,12 @@ import tensorflow as tf
 
 @tf.function
 def transform_targets_for_output(y_true, grid_size, anchor_idxs, classes):
-    # y_true: (N, boxes, (x1, y1, x2, y2, class, best_anchor))
+    # y_true: (N, boxes, (x1, y1, x2, y2,size , class, best_anchor))
     N = tf.shape(y_true)[0]
 
     # y_true_out: (N, grid, grid, anchors, [x, y, w, h, obj, class])
     y_true_out = tf.zeros(
-        (N, grid_size, grid_size, tf.shape(anchor_idxs)[0], 6))
+        (N, grid_size, grid_size, tf.shape(anchor_idxs)[0], 7))
 
     anchor_idxs = tf.cast(anchor_idxs, tf.int32)
 
@@ -20,7 +20,7 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs, classes):
             if tf.equal(y_true[i][j][2], 0):
                 continue
             anchor_eq = tf.equal(
-                anchor_idxs, tf.cast(y_true[i][j][5], tf.int32))
+                anchor_idxs, tf.cast(y_true[i][j][6], tf.int32))
 
             if tf.reduce_any(anchor_eq):
                 box = y_true[i][j][0:4]
@@ -33,7 +33,7 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs, classes):
                 indexes = indexes.write(
                     idx, [i, grid_xy[1], grid_xy[0], anchor_idx[0][0]])
                 updates = updates.write(
-                    idx, [box[0], box[1], box[2], box[3], 1, y_true[i][j][4]])
+                    idx, [box[0], box[1], box[2], box[3], y_true[i][j][4], 1, y_true[i][j][5]])
                 idx += 1
 
     # tf.print(indexes.stack())
@@ -81,14 +81,15 @@ IMAGE_FEATURE_MAP = {
     'image/width': tf.io.FixedLenFeature([], tf.int64),
     'image/height': tf.io.FixedLenFeature([], tf.int64),
     'image/filename': tf.io.FixedLenFeature([], tf.string),
-    'image/source_id': tf.io.FixedLenFeature([], tf.string),
-    'image/key/sha256': tf.io.FixedLenFeature([], tf.string),
+    # 'image/source_id': tf.io.FixedLenFeature([], tf.string),
+    # 'image/key/sha256': tf.io.FixedLenFeature([], tf.string),
     'image/encoded': tf.io.FixedLenFeature([], tf.string),
     'image/format': tf.io.FixedLenFeature([], tf.string),
     'image/object/bbox/xmin': tf.io.VarLenFeature(tf.float32),
     'image/object/bbox/ymin': tf.io.VarLenFeature(tf.float32),
     'image/object/bbox/xmax': tf.io.VarLenFeature(tf.float32),
     'image/object/bbox/ymax': tf.io.VarLenFeature(tf.float32),
+    'image/object/bbox/size': tf.io.VarLenFeature(tf.float32),
     'image/object/class/text': tf.io.VarLenFeature(tf.string),
     'image/object/class/label': tf.io.VarLenFeature(tf.int64),
     'image/object/difficult': tf.io.VarLenFeature(tf.int64),
@@ -105,11 +106,13 @@ def parse_tfrecord(tfrecord, class_table):
     class_text = tf.sparse.to_dense(
         x['image/object/class/text'], default_value='')
     labels = tf.cast(class_table.lookup(class_text), tf.float32)
-    y_train = tf.stack([tf.sparse.to_dense(x['image/object/bbox/xmin']),
+    test = [tf.sparse.to_dense(x['image/object/bbox/xmin']),
                         tf.sparse.to_dense(x['image/object/bbox/ymin']),
                         tf.sparse.to_dense(x['image/object/bbox/xmax']),
                         tf.sparse.to_dense(x['image/object/bbox/ymax']),
-                        labels], axis=1)
+                        tf.sparse.to_dense(x['image/object/bbox/size']),
+                        labels]
+    y_train = tf.stack(test, axis=1)
 
     paddings = [[0, 100 - tf.shape(y_train)[0]], [0, 0]]
     y_train = tf.pad(y_train, paddings)
@@ -139,5 +142,45 @@ def load_fake_dataset():
     ] + [[0, 0, 0, 0, 0]] * 5
     y_train = tf.convert_to_tensor(labels, tf.float32)
     y_train = tf.expand_dims(y_train, axis=0)
+
+    return tf.data.Dataset.from_tensor_slices((x_train, y_train))
+
+def load_text_dataset(dasetTextPath):
+    
+    x_train = []
+    y_train = tf.Variable(tf.zeros(shape=(1,100,5)), name="b")
+    text = open(dasetTextPath, "r")
+    for imagePath in text.read().splitlines():
+        image = tf.image.decode_jpeg(
+            open(imagePath, 'rb').read(), channels=3)
+        labelPath = imagePath.replace('.jpg','.txt')
+        labelText = open(labelPath, "r")
+        bboxText = labelText.read().splitlines()
+        labels = []
+        for text in bboxText:
+            array = text.split(' ')
+            if len(array) >= 5:
+                class_id = int(array[0])
+                center_x = float(array[1])
+                center_y = float(array[2])
+                width = float(array[3])
+                height = float(array[4])
+                labels.append([center_x - width / 2.0, center_x + width / 2.0, center_y - height / 2.0,  center_y + height / 2.0, class_id])
+        labels += [[0, 0, 0, 0, 0]] * 5
+        x_train.append(image)
+        y_train_tmp = tf.convert_to_tensor(labels, tf.float32)
+        paddings = [[0, 100 - tf.shape(y_train_tmp)[0]], [0, 0]]
+        y_train_tmp = tf.pad(y_train_tmp, paddings)
+        # if y_train == None:
+        #     y_train = y_train_tmp
+        # else:
+        y_train = tf.concat([y_train, [y_train_tmp]],0)
+        # y_train.append(labels)
+    # print(y_train.shape)
+    x_train = tf.convert_to_tensor(x_train, tf.uint8)
+    y_train = y_train[1:,:,:]
+    print(x_train.shape)
+    print(y_train.shape)
+    # y_train = tf.convert_to_tensor(y_train, tf.float32)
 
     return tf.data.Dataset.from_tensor_slices((x_train, y_train))

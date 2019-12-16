@@ -10,14 +10,14 @@ from yolov3_tf2.models import (
 from yolov3_tf2.dataset import transform_images
 from yolov3_tf2.utils import draw_outputs
 
-flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
-flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
+flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
+flags.DEFINE_string('weights', './checkpoints/yolov3_train_100.tf',
                     'path to weights file')
-flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
+flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_integer('size', 416, 'resize images to')
-flags.DEFINE_string('image', './data/girl.png', 'path to input image')
+flags.DEFINE_string('image', 'data/2019-10-07_14-41-56_frame03233.jpg', 'path to input image')
 flags.DEFINE_string('output', './output.jpg', 'path to output image')
-flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
+flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
 
 def main(_argv):
@@ -42,18 +42,20 @@ def main(_argv):
     img = transform_images(img, FLAGS.size)
 
     t1 = time.time()
-    boxes, scores, classes, nums = yolo(img)
+    boxes, sizes, scores, classes , nums = yolo(img)
     t2 = time.time()
     logging.info('time: {}'.format(t2 - t1))
 
-    logging.info('detections:')
+    logging.info('detections:{}'.format(nums[0]))
     for i in range(nums[0]):
-        logging.info('\t{}, {}, {}'.format(class_names[int(classes[0][i])],
+        logging.info('\t{}, {}, {} size = {}'.format(class_names[int(classes[0][i])],
                                            np.array(scores[0][i]),
-                                           np.array(boxes[0][i])))
+                                           np.array(boxes[0][i]),
+                                           sizes[i][0]))
+                                           
 
     img = cv2.imread(FLAGS.image)
-    img = draw_outputs(img, (boxes, scores, classes, nums), class_names)
+    img = draw_outputs(img, (boxes, sizes , scores, classes, nums), class_names)
     cv2.imwrite(FLAGS.output, img)
     logging.info('output saved to: {}'.format(FLAGS.output))
 

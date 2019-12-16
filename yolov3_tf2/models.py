@@ -23,7 +23,7 @@ from .batch_norm import BatchNormalization
 from .utils import broadcast_iou
 
 flags.DEFINE_float('yolo_iou_threshold', 0.5, 'iou threshold')
-flags.DEFINE_float('yolo_score_threshold', 0.5, 'score threshold')
+flags.DEFINE_float('yolo_score_threshold', 0.25, 'score threshold')
 
 yolo_anchors = np.array([(10, 13), (16, 30), (33, 23), (30, 61), (62, 45),
                          (59, 119), (116, 90), (156, 198), (373, 326)],
@@ -139,21 +139,22 @@ def YoloOutput(filters, anchors, classes, name=None):
     def yolo_output(x_in):
         x = inputs = Input(x_in.shape[1:])
         x = DarknetConv(x, filters * 2, 3)
-        x = DarknetConv(x, anchors * (classes + 5), 1, batch_norm=False)
+        x = DarknetConv(x, anchors * (classes + 6), 1, batch_norm=False)
         x = Lambda(lambda x: tf.reshape(x, (-1, tf.shape(x)[1], tf.shape(x)[2],
-                                            anchors, classes + 5)))(x)
+                                            anchors, classes + 6)))(x)
         return tf.keras.Model(inputs, x, name=name)(x_in)
     return yolo_output
 
 
 def yolo_boxes(pred, anchors, classes):
-    # pred: (batch_size, grid, grid, anchors, (x, y, w, h, obj, ...classes))
+    # pred: (batch_size, grid, grid, anchors, (x, y, w, h, size , obj, ...classes))
     grid_size = tf.shape(pred)[1]
-    box_xy, box_wh, objectness, class_probs = tf.split(
-        pred, (2, 2, 1, classes), axis=-1)
+    box_xy, box_wh, size, objectness,  class_probs = tf.split(
+        pred, (2, 2, 1, 1, classes), axis=-1)
 
     box_xy = tf.sigmoid(box_xy)
     objectness = tf.sigmoid(objectness)
+    size = tf.sigmoid(size)
     class_probs = tf.sigmoid(class_probs)
     pred_box = tf.concat((box_xy, box_wh), axis=-1)  # original xywh for loss
 
@@ -169,19 +170,23 @@ def yolo_boxes(pred, anchors, classes):
     box_x2y2 = box_xy + box_wh / 2
     bbox = tf.concat([box_x1y1, box_x2y2], axis=-1)
 
-    return bbox, objectness, class_probs, pred_box
+    return bbox, size, objectness, class_probs, pred_box
 
 
 def yolo_nms(outputs, anchors, masks, classes):
-    # boxes, conf, type
-    b, c, t = [], [], []
-
+    # boxes, size, conf, type 
+    b, s , c, t = [], [], [], []
+    # print('out shape = {}'.format(outputs.shape))
     for o in outputs:
         b.append(tf.reshape(o[0], (tf.shape(o[0])[0], -1, tf.shape(o[0])[-1])))
-        c.append(tf.reshape(o[1], (tf.shape(o[1])[0], -1, tf.shape(o[1])[-1])))
-        t.append(tf.reshape(o[2], (tf.shape(o[2])[0], -1, tf.shape(o[2])[-1])))
-
+        s.append(tf.reshape(o[1], (tf.shape(o[1])[0], -1, tf.shape(o[1])[-1])))
+        c.append(tf.reshape(o[2], (tf.shape(o[2])[0], -1, tf.shape(o[2])[-1])))
+        t.append(tf.reshape(o[3], (tf.shape(o[3])[0], -1, tf.shape(o[3])[-1])))
+    
+    for i in range(0,len(b)):
+        print('{} {} {} {}'.format(b[i].shape,s[i].shape , c[i].shape,t[i].shape))
     bbox = tf.concat(b, axis=1)
+    size = tf.concat(s, axis=1)
     confidence = tf.concat(c, axis=1)
     class_probs = tf.concat(t, axis=1)
 
@@ -195,8 +200,34 @@ def yolo_nms(outputs, anchors, masks, classes):
         iou_threshold=FLAGS.yolo_iou_threshold,
         score_threshold=FLAGS.yolo_score_threshold
     )
-
-    return boxes, scores, classes, valid_detections
+    print(bbox.shape[1])
+    bbox_size = bbox.shape[1]
+        # print(tf.slice(i,[0,0,0],[0,-1,4]))
+    sizes = []
+    nums = valid_detections
+    if bbox_size is not None:
+        for i in range(0,nums[0]):
+            for j in range(0,bbox_size):
+                # print(tf.gather_nd(bbox,[0,j]))
+                items = tf.math.equal(tf.gather_nd(bbox,[0,j]), boxes[0][i])
+                x = tf.reduce_all(items)
+                if x:
+                    print(size[0][j])
+                    sizes.append(size[0][j])
+        # for j in range(ls[1]):
+        #     print(i[-1,j,:])
+    #     print(i.shape[:,:,4].shape)
+            # items = tf.math.equal(i[0][j], boxes[0][0])
+            # print(items)
+        # for j in i:
+        # #if b[0][i][0] == boxes[0] and b[0][i][1] == boxes[1] and b[0][i][2] == boxes[2] and b[0][i][3] == boxes[3]:
+        #     items = tf.math.equal(j, boxes[0])
+        #     print(items)
+        #     print(s[0][i][0])
+    print(len(sizes))
+    print(sizes)
+    print(valid_detections)
+    return boxes, tf.convert_to_tensor(sizes, tf.float32) , scores, classes, valid_detections
 
 
 def YoloV3(size=None, channels=3, anchors=yolo_anchors,
@@ -243,30 +274,31 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
     output_1 = YoloOutput(128, len(masks[1]), classes, name='yolo_output_1')(x)
 
     if training:
-        return Model(inputs, (output_0, output_1), name='yolov3')
+        return Model(inputs, (output_0, output_1), name='yolov3_tiny')
 
     boxes_0 = Lambda(lambda x: yolo_boxes(x, anchors[masks[0]], classes),
                      name='yolo_boxes_0')(output_0)
     boxes_1 = Lambda(lambda x: yolo_boxes(x, anchors[masks[1]], classes),
                      name='yolo_boxes_1')(output_1)
     outputs = Lambda(lambda x: yolo_nms(x, anchors, masks, classes),
-                     name='yolo_nms')((boxes_0[:3], boxes_1[:3]))
+                     name='yolo_nms')((boxes_0[:4], boxes_1[:4]))
     return Model(inputs, outputs, name='yolov3_tiny')
 
 
 def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
     def yolo_loss(y_true, y_pred):
         # 1. transform all pred outputs
-        # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, obj, ...cls))
-        pred_box, pred_obj, pred_class, pred_xywh = yolo_boxes(
+        # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, size, obj, ...cls))
+        # bbox, size, objectness, class_probs, pred_box
+        pred_box, pre_size, pred_obj, pred_class, pred_xywh = yolo_boxes(
             y_pred, anchors, classes)
         pred_xy = pred_xywh[..., 0:2]
         pred_wh = pred_xywh[..., 2:4]
 
         # 2. transform all true outputs
-        # y_true: (batch_size, grid, grid, anchors, (x1, y1, x2, y2, obj, cls))
-        true_box, true_obj, true_class_idx = tf.split(
-            y_true, (4, 1, 1), axis=-1)
+        # y_true: (batch_size, grid, grid, anchors, (x1, y1, x2, y2, size, obj, cls))
+        true_box, true_sizes, true_obj, true_class_idx = tf.split(
+            y_true, (4, 1, 1, 1), axis=-1)
         true_xy = (true_box[..., 0:2] + true_box[..., 2:4]) / 2
         true_wh = true_box[..., 2:4] - true_box[..., 0:2]
 
@@ -296,6 +328,8 @@ def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
             tf.reduce_sum(tf.square(true_xy - pred_xy), axis=-1)
         wh_loss = obj_mask * box_loss_scale * \
             tf.reduce_sum(tf.square(true_wh - pred_wh), axis=-1)
+        size_loss = obj_mask * box_loss_scale * \
+            tf.reduce_sum(tf.square(pre_size - true_sizes), axis=-1)
         obj_loss = binary_crossentropy(true_obj, pred_obj)
         obj_loss = obj_mask * obj_loss + \
             (1 - obj_mask) * ignore_mask * obj_loss
@@ -306,8 +340,9 @@ def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
         # 6. sum over (batch, gridx, gridy, anchors) => (batch, 1)
         xy_loss = tf.reduce_sum(xy_loss, axis=(1, 2, 3))
         wh_loss = tf.reduce_sum(wh_loss, axis=(1, 2, 3))
+        size_loss = tf.reduce_sum(size_loss, axis=(1, 2, 3))
         obj_loss = tf.reduce_sum(obj_loss, axis=(1, 2, 3))
         class_loss = tf.reduce_sum(class_loss, axis=(1, 2, 3))
 
-        return xy_loss + wh_loss + obj_loss + class_loss
+        return xy_loss + wh_loss + size_loss + obj_loss + class_loss
     return yolo_loss
