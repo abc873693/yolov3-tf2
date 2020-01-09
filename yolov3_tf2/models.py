@@ -191,7 +191,7 @@ def yolo_nms(outputs, anchors, masks, classes):
     class_probs = tf.concat(t, axis=1)
 
     scores = confidence * class_probs
-    boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
+    boxes, scores_nms, classes, valid_detections = tf.image.combined_non_max_suppression(
         boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
         scores=tf.reshape(
             scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
@@ -200,35 +200,98 @@ def yolo_nms(outputs, anchors, masks, classes):
         iou_threshold=FLAGS.yolo_iou_threshold,
         score_threshold=FLAGS.yolo_score_threshold
     )
-    print(bbox.shape[1])
+
     bbox_size = bbox.shape[1]
         # print(tf.slice(i,[0,0,0],[0,-1,4]))
-    sizes = []
-    nums = valid_detections
+    picked_boxes, picked_score, picked_size = [], [], []
     if bbox_size is not None:
-        for i in range(0,nums[0]):
-            for j in range(0,bbox_size):
-                # print(tf.gather_nd(bbox,[0,j]))
-                items = tf.math.equal(tf.gather_nd(bbox,[0,j]), boxes[0][i])
-                x = tf.reduce_all(items)
-                if x:
-                    print(size[0][j])
-                    sizes.append(size[0][j])
-        # for j in range(ls[1]):
-        #     print(i[-1,j,:])
-    #     print(i.shape[:,:,4].shape)
-            # items = tf.math.equal(i[0][j], boxes[0][0])
-            # print(items)
-        # for j in i:
-        # #if b[0][i][0] == boxes[0] and b[0][i][1] == boxes[1] and b[0][i][2] == boxes[2] and b[0][i][3] == boxes[3]:
-        #     items = tf.math.equal(j, boxes[0])
-        #     print(items)
-        #     print(s[0][i][0])
-    print(len(sizes))
-    print(sizes)
-    print(valid_detections)
-    return boxes, tf.convert_to_tensor(sizes, tf.float32) , scores, classes, valid_detections
+        picked_boxes, picked_score, picked_size = size_nms(bbox.numpy()[0, :, :], scores.numpy()[0, :, 0],size.numpy()[0, :, 0], FLAGS.yolo_iou_threshold, FLAGS.yolo_score_threshold)
 
+    valid_detections = tf.convert_to_tensor([len(picked_boxes)], tf.float32)
+    picked_boxes = tf.reshape(tf.convert_to_tensor(picked_boxes, tf.float32),(1,-1,4))
+    picked_size = tf.reshape(tf.convert_to_tensor(picked_size, tf.float32),(1,-1))
+    picked_score = tf.reshape(tf.convert_to_tensor(picked_score, tf.float32),(1,-1))
+       
+    return picked_boxes, picked_size , picked_score, classes, valid_detections
+
+def size_nms(bounding_boxes, confidence_score ,object_sizes ,threshold_iou, threshold_score):
+    # If no bounding boxes, return empty list
+    if len(bounding_boxes) == 0:
+        return [], [], []
+    canidate_boxes = np.array(bounding_boxes)
+    canidate_score = np.array(confidence_score)
+    canidate_size = np.array(object_sizes)
+    
+    # Bounding boxes
+    boxes = []
+    # Confidence scores of bounding boxes
+    score = []
+    # Object sizes of bounding boxes
+    size = []
+
+    for i in range (0,len(canidate_boxes)):
+        if canidate_score[i] >= threshold_score:
+            boxes.append(canidate_boxes[i])
+            score.append(canidate_score[i])
+            size.append(canidate_size[i])
+
+    boxes = np.array(boxes)
+    score = np.array(score)
+    size = np.array(size)
+    # coordinates of bounding boxes
+    start_x = boxes[:, 0]
+    start_y = boxes[:, 1]
+    end_x = boxes[:, 2]
+    end_y = boxes[:, 3]
+
+
+    # Picked bounding boxes
+    picked_boxes = []
+    picked_score = []
+    picked_size = []
+
+    # Compute areas of bounding boxes
+    areas = (end_x - start_x + 1) * (end_y - start_y + 1)
+
+    # Sort by confidence score of bounding boxes
+    order = np.argsort(score)
+
+    # Iterate bounding boxes
+    while order.size > 0:
+        # The index of largest confidence score
+        index = order[-1]
+
+        # Pick the bounding box with largest confidence score
+        picked_boxes.append(boxes[index])
+        picked_score.append(score[index])
+        picked_size.append(size[index])
+
+        # Compute ordinates of intersection-over-union(IOU)
+        x1 = np.maximum(start_x[index], start_x[order[:-1]])
+        x2 = np.minimum(end_x[index], end_x[order[:-1]])
+        y1 = np.maximum(start_y[index], start_y[order[:-1]])
+        y2 = np.minimum(end_y[index], end_y[order[:-1]])
+
+        # Compute areas of intersection-over-union
+        w = np.maximum(0.0, x2 - x1 + 1)
+        h = np.maximum(0.0, y2 - y1 + 1)
+        intersection = w * h
+
+        # Compute the ratio between intersection and union
+        ratio = intersection / (areas[index] + areas[order[:-1]] - intersection)
+
+        left = np.where(ratio < threshold_iou)
+        order = order[left]
+    # picked_boxes_final = []
+    # picked_score_final = []
+    # picked_size_final = []
+    # for i in range (0,len(picked_boxes)):
+    #     if picked_score[i] >= threshold_score:
+    #         picked_boxes_final.append(picked_boxes[i])
+    #         picked_score_final.append(picked_score[i])
+    #         picked_size_final.append(picked_size[i])
+    # return picked_boxes_final, picked_score_final, picked_size_final
+    return picked_boxes, picked_score, picked_size
 
 def YoloV3(size=None, channels=3, anchors=yolo_anchors,
            masks=yolo_anchor_masks, classes=80, training=False):

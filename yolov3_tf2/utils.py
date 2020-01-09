@@ -101,7 +101,7 @@ def broadcast_iou(box_1, box_2):
 
 def draw_outputs(img, outputs, class_names):
     boxes, sizes, objectness, classes, nums = outputs
-    boxes, sizes, objectness, classes, nums = boxes[0],sizes ,  objectness[0], classes[0], nums[0]
+    boxes, sizes, objectness, classes, nums = boxes[0], sizes[0] ,  objectness[0], classes[0], nums[0]
     wh = np.flip(img.shape[0:2])
     for i in range(nums):
         x1y1 = tuple((np.array(boxes[i][0:2]) * wh).astype(np.int32))
@@ -116,7 +116,7 @@ def draw_outputs(img, outputs, class_names):
         cv2.putText(img,'{} {:.4f}%'.format(class_names[int(classes[i])], objectness[i]),
                     end, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     [0, 255, 0], 2)
-        cv2.putText(img,'size = {:.4f}'.format(sizes[i][0]),
+        cv2.putText(img,'size = {:.4f}'.format(sizes[i]),
                     x1y1, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     [0, 255, 0], 2)
     return img
