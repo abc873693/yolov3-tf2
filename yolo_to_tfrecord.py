@@ -72,7 +72,7 @@ def create_tf_example(imagePath):
             center_y = float(array[2])
             width = float(array[3])
             height = float(array[4])
-            if len(array >= 5):
+            if len(array) >= 6:
                 size = float(array[5])
             xmins.append(center_x - width / 2.0)  # xmin
             xmaxs.append(center_x + width / 2.0)  # xmax

@@ -170,3 +170,61 @@ def compute_iou(rec1, rec2):
     else:
         intersect = (right_line - left_line) * (bottom_line - top_line)
         return (intersect / (sum_area - intersect))*1.0
+
+def read_yolo_labels(label_path):
+    label_text = open(label_path, "r")
+    labels = []
+    label_text = open(label_path, "r")
+    lines = label_text.read().splitlines()
+    has_size_label = True
+    for text in lines:
+        if text == '':
+            continue
+        array = text.split(' ')
+        if len(array) != 0:
+            class_id = int(array[0])
+            center_x = float(array[1])
+            center_y = float(array[2])
+            width = float(array[3])
+            height = float(array[4])
+            if len(array) >= 6:
+                size = float(array[5])
+            else:
+                has_size_label = False
+            x1 = center_x - width / 2.0  # xmin
+            x2 = center_x + width / 2.0  # xmax
+            y1 = center_y - height / 2.0  # ymin
+            y2 = center_y + height / 2.0  # ymax
+            # [y1, x1, y2, x2]
+            label = [class_id, x1, y1, x2, y2, size]
+            labels.append(label)
+    return np.array(labels), has_size_label, len(labels)
+
+def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
+    boxes, sizes, objectness, classes, nums = outputs
+    boxes_ture, sizes_ture, classes_ture, nums_ture = grund_truths
+    boxes, sizes, objectness, classes, nums = boxes[0].numpy(), sizes[0].numpy() , objectness[0].numpy(), classes[0].numpy(), nums[0]
+    TP , FP = 0, 0
+    size_errors = []
+    for i in range(nums):
+        max_iou = 0
+        index = -1
+        for j in range(nums_ture):
+            iou = compute_iou(boxes[i], boxes_ture[j])
+            if iou > max_iou and iou >= iou_trethold and classes[i] == classes_ture[j]:
+                max_iou = iou
+                index = j
+        if index == -1:
+            FP += 1
+        else:
+            TP += 1
+            size_ralative_error = abs(sizes[i] - sizes_ture[index]) / sizes_ture[index]
+            # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
+            # logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(sizes[i],sizes_ture[index], size_ralative_error))
+            size_errors.append(size_ralative_error)
+    are = 0
+    if len(size_errors) != 0:
+        are = sum(size_errors)/ len(size_errors)
+    # logging.info('TP = {} FP = {}, size average ralative error = {}'.format(TP, FP, are))
+    return TP, FP, (nums_ture - TP), size_errors
+        

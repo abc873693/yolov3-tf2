@@ -235,6 +235,9 @@ def size_nms(bounding_boxes, confidence_score ,object_sizes ,threshold_iou, thre
             score.append(canidate_score[i])
             size.append(canidate_size[i])
 
+    if len(boxes) == 0:
+        return [], [], []
+        
     boxes = np.array(boxes)
     score = np.array(score)
     size = np.array(size)

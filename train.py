@@ -17,8 +17,8 @@ from yolov3_tf2.models import (
 from yolov3_tf2.utils import freeze_all
 import yolov3_tf2.dataset as dataset
 
-flags.DEFINE_string('dataset', './data/microfield_5/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/microfield_5/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('dataset', './data/microfield_5_v2/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/microfield_5_v2/valid.tfrecord', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
                     'path to weights file')
