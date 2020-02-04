@@ -66,7 +66,7 @@ def create_tf_example(imagePath):
 
     for text in bboxes:
         array = text.split(' ')
-        if len(array) != 0:
+        if len(array) != 0 and array[0] != '':
             class_id = int(array[0])
             center_x = float(array[1])
             center_y = float(array[2])
@@ -74,6 +74,8 @@ def create_tf_example(imagePath):
             height = float(array[4])
             if len(array) >= 6:
                 size = float(array[5])
+            else:
+                size = 0.0
             xmins.append(center_x - width / 2.0)  # xmin
             xmaxs.append(center_x + width / 2.0)  # xmax
             ymins.append(center_y - height / 2.0)  # ymin
@@ -144,9 +146,11 @@ def main(_argv):
     output_path = FLAGS.output_path
     writer = tf.io.TFRecordWriter(output_path)
     for filePath in text.read().splitlines():
-        tf_example = create_tf_example(filePath)
-        writer.write(tf_example.SerializeToString())
-        output_path = os.path.join(os.getcwd(), output_path)
+        labelPath = filePath.replace('.jpg', '.txt')
+        if os.path.isfile(filePath) and os.path.isfile(labelPath):
+            tf_example = create_tf_example(filePath)
+            writer.write(tf_example.SerializeToString())
+            output_path = os.path.join(os.getcwd(), output_path)
 
     print('Successfully created the TFRecords: {}'.format(output_path))
     writer.close()
