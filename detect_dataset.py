@@ -117,7 +117,7 @@ def main(_argv):
     precision = TP_total / (TP_total + FP_total)
     recall = TP_total / (TP_total + FN_total)
     results_text = open('records.txt', "a")
-    results_text.write('{} {} {} {:.2f}% {:.2f}% {:.2f}%\n'.format(TP_total, FP_total, FN_total, precision * 100.0, recall * 100.0, are * 100.0))
+    results_text.write('{},{},{},{:.2f}%,{:.2f}%,{:.2f}%\n'.format(TP_total, FP_total, FN_total, precision * 100.0, recall * 100.0, are * 100.0))
     logging.info('TP = {} FP = {} FN = {}'.format(TP_total, FP_total, FN_total))
     logging.info('precision = {:.2f} recall = {:.2f}, size average ralative error = {:.2f}'.format(precision, recall, are * 100.0))
     results_text.close()
