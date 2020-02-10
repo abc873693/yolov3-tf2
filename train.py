@@ -17,9 +17,13 @@ from yolov3_tf2.models import (
 from yolov3_tf2.utils import freeze_all
 import yolov3_tf2.dataset as dataset
 
-flags.DEFINE_string('dataset', './data/microfield_5_v2/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/microfield_5_v2/valid.tfrecord', 'path to validation dataset')
+import os
+
+flags.DEFINE_string('dataset', './data/shrimp_mix/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/shrimp_mix/valid.tfrecord', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
+flags.DEFINE_string('name', '20200204_1',
+                    'path to weights name')
 flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
                     'path to weights file')
 flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
@@ -45,6 +49,10 @@ def main(_argv):
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
+    weight_base_dir = 'checkpoints/{}/'.format(FLAGS.name)
+    if not os.path.exists(weight_base_dir):
+        os.makedirs(weight_base_dir)
 
     if FLAGS.tiny:
         model = YoloV3Tiny(FLAGS.size, training=True,
@@ -163,7 +171,7 @@ def main(_argv):
             avg_val_loss.reset_states()
             if epoch % 10 == 0:
                 model.save_weights(
-                    'checkpoints/yolov3_train_{}.tf'.format(epoch))
+                    '{}yolov3_train_{}.tf'.format(weight_base_dir, epoch))
     else:
         model.compile(optimizer=optimizer, loss=loss,
                       run_eagerly=(FLAGS.mode == 'eager_fit'))
@@ -171,7 +179,7 @@ def main(_argv):
         callbacks = [
             ReduceLROnPlateau(verbose=1),
             EarlyStopping(patience=3, verbose=1),
-            ModelCheckpoint('checkpoints/yolov3_train_{epoch}.tf',
+            ModelCheckpoint(weight_base_dir + 'yolov3_train_{epoch}.tf',
                             verbose=1, save_weights_only=True),
             TensorBoard(log_dir='logs')
         ]
