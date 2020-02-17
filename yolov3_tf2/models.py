@@ -351,6 +351,13 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
     return Model(inputs, outputs, name='yolov3_tiny')
 
 
+@tf.function
+def minus_if_zero(a, b):
+    c = tf.math.subtract(a,b)
+    c = c * b
+    c = tf.math.divide_no_nan(c, b)
+    return c
+
 def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
     def yolo_loss(y_true, y_pred):
         # 1. transform all pred outputs
@@ -394,14 +401,8 @@ def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
             tf.reduce_sum(tf.square(true_xy - pred_xy), axis=-1)
         wh_loss = obj_mask * box_loss_scale * \
             tf.reduce_sum(tf.square(true_wh - pred_wh), axis=-1)
-        nps = true_sizes.numpy()
-        is_all_zero = not np.any(nps)
-        if not is_all_zero:
-            size_loss = obj_mask * box_loss_scale * \
-                tf.reduce_sum(tf.square(pre_size - true_sizes), axis=-1)
-        else:
-            size_loss = obj_mask * box_loss_scale * \
-                tf.reduce_sum(tf.square(true_sizes), axis=-1)
+        size_loss = obj_mask * box_loss_scale * \
+                tf.reduce_sum(tf.square(minus_if_zero(pre_size , true_sizes)), axis=-1)            
         obj_loss = binary_crossentropy(true_obj, pred_obj)
         obj_loss = obj_mask * obj_loss + \
             (1 - obj_mask) * ignore_mask * obj_loss
