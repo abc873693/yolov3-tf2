@@ -137,6 +137,11 @@ def main(_argv):
         loss_records = []
         loss_val_records = []
         
+        loss_best = 10000000.0
+        loss_best_epochs = 0
+        loss_val_best = 10000000.0
+        loss_val_best_epochs = 0
+        
         for epoch in range(1, FLAGS.epochs + 1):
             for batch, (images, labels) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
@@ -177,12 +182,24 @@ def main(_argv):
 
             logging.info("{}, train: {}, val: {}".format(
                 epoch,
-                avg_loss.result().numpy(),
-                avg_val_loss.result().numpy()))
+                train_loss,
+                val_loss))
             
             loss_text = open('{}loss.txt'.format(weight_base_dir), "a")
             loss_text.write('{},{}\n'.format(avg_loss.result().numpy(), avg_val_loss.result().numpy()))
             loss_text.close()
+
+            if loss_current < loss_best:
+                loss_best = loss_current
+                loss_best_epochs = epoch
+                model.save_weights(
+                    '{}yolov3_train_best.tf'.format(weight_base_dir))
+
+            if loss_val_current < loss_val_best:
+                loss_val_current = loss_val_best
+                loss_val_best_epochs = epoch
+                model.save_weights(
+                    '{}yolov3_train_val_best.tf'.format(weight_base_dir))
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
@@ -192,6 +209,13 @@ def main(_argv):
             save_loss_plot(train_loss = loss_records,val_loss = loss_val_records, save_path='{}loss.png'.format(weight_base_dir))
             model.save_weights(
                     '{}yolov3_train_last.tf'.format(weight_base_dir))
+            if epoch == FLAGS.epochs:
+                logging.info("{}, loss_best: {} {}, loss_val_best: {} {}".format(
+                    epoch,
+                    loss_best_epochs,
+                    loss_best,
+                    loss_val_best_epochs,
+                    loss_val_best))
     else:
         model.compile(optimizer=optimizer, loss=loss,
                       run_eagerly=(FLAGS.mode == 'eager_fit'))
