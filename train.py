@@ -190,6 +190,8 @@ def main(_argv):
                 model.save_weights(
                     '{}yolov3_train_{}.tf'.format(weight_base_dir, epoch))
             save_loss_plot(train_loss = loss_records,val_loss = loss_val_records, save_path='{}loss.png'.format(weight_base_dir))
+            model.save_weights(
+                    '{}yolov3_train_last.tf'.format(weight_base_dir))
     else:
         model.compile(optimizer=optimizer, loss=loss,
                       run_eagerly=(FLAGS.mode == 'eager_fit'))
