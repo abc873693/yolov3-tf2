@@ -14,7 +14,11 @@ from yolov3_tf2.models import (
     yolo_anchors, yolo_anchor_masks,
     yolo_tiny_anchors, yolo_tiny_anchor_masks
 )
-from yolov3_tf2.utils import freeze_all
+from yolov3_tf2.utils import (
+    freeze_all,
+    save_loss_plot,
+    randomHSV
+)
 import yolov3_tf2.dataset as dataset
 
 import os
@@ -130,6 +134,9 @@ def main(_argv):
         avg_loss = tf.keras.metrics.Mean('loss', dtype=tf.float32)
         avg_val_loss = tf.keras.metrics.Mean('val_loss', dtype=tf.float32)
 
+        loss_records = []
+        loss_val_records = []
+        
         for epoch in range(1, FLAGS.epochs + 1):
             for batch, (images, labels) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
@@ -162,16 +169,27 @@ def main(_argv):
                     list(map(lambda x: np.sum(x.numpy()), pred_loss))))
                 avg_val_loss.update_state(total_loss)
 
+            train_loss = avg_loss.result().numpy()
+            val_loss = avg_val_loss.result().numpy()
+
+            loss_records.append(train_loss)
+            loss_val_records.append(val_loss)
+
             logging.info("{}, train: {}, val: {}".format(
                 epoch,
                 avg_loss.result().numpy(),
                 avg_val_loss.result().numpy()))
+            
+            loss_text = open('{}loss.txt'.format(weight_base_dir), "a")
+            loss_text.write('{},{}\n'.format(avg_loss.result().numpy(), avg_val_loss.result().numpy()))
+            loss_text.close()
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
             if epoch % 10 == 0:
                 model.save_weights(
                     '{}yolov3_train_{}.tf'.format(weight_base_dir, epoch))
+            save_loss_plot(train_loss = loss_records,val_loss = loss_val_records, save_path='{}loss.png'.format(weight_base_dir))
     else:
         model.compile(optimizer=optimizer, loss=loss,
                       run_eagerly=(FLAGS.mode == 'eager_fit'))

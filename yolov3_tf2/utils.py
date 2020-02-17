@@ -2,6 +2,7 @@ from absl import logging
 import numpy as np
 import tensorflow as tf
 import cv2
+import matplotlib.pyplot as plt
 
 YOLOV3_LAYER_LIST = [
     'yolo_darknet',
@@ -227,6 +228,16 @@ def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
         are = sum(size_errors)/ len(size_errors)
     # logging.info('TP = {} FP = {}, size average ralative error = {}'.format(TP, FP, are))
     return TP, FP, (nums_ture - TP), size_errors
+
+def save_loss_plot(train_loss = [], val_loss = [], precision = [],save_path = './loss.png'):
+    plt.plot(train_loss)
+    plt.plot(val_loss)
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'valid'], loc='upper left')
+    plt.savefig(save_path, dpi=100)
+    plt.clf()
         
 def randomHSV(images, saturation, exposure, hue):
     hsv_images = tf.image.rgb_to_hsv(images)
