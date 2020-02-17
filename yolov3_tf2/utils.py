@@ -228,3 +228,16 @@ def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
     # logging.info('TP = {} FP = {}, size average ralative error = {}'.format(TP, FP, are))
     return TP, FP, (nums_ture - TP), size_errors
         
+def randomHSV(images, saturation, exposure, hue):
+    hsv_images = tf.image.rgb_to_hsv(images)
+    size = hsv_images.shape[0]
+    rand_list = []
+    for i in range(0, size):
+        d_saturation = random.uniform( 1/saturation, saturation)
+        d_exposure = random.uniform( 1/exposure, exposure)
+        rand_list.append([1.0, d_saturation, d_exposure])
+    rand_tensor = tf.convert_to_tensor(rand_list)
+    hsv_images = tf.einsum('ijkl,il->ijkl', images, rand_tensor)
+    images = tf.image.hsv_to_rgb(hsv_images)
+    images = tf.image.random_hue(image = images, max_delta = hue)
+    return images
