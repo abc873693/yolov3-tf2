@@ -189,14 +189,14 @@ def main(_argv):
             loss_text.write('{},{}\n'.format(avg_loss.result().numpy(), avg_val_loss.result().numpy()))
             loss_text.close()
 
-            if loss_current < loss_best:
-                loss_best = loss_current
+            if train_loss < loss_best:
+                loss_best = train_loss
                 loss_best_epochs = epoch
                 model.save_weights(
                     '{}yolov3_train_best.tf'.format(weight_base_dir))
 
-            if loss_val_current < loss_val_best:
-                loss_val_current = loss_val_best
+            if val_loss < loss_val_best:
+                loss_val_best = val_loss
                 loss_val_best_epochs = epoch
                 model.save_weights(
                     '{}yolov3_train_val_best.tf'.format(weight_base_dir))
