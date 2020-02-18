@@ -17,16 +17,17 @@ from yolov3_tf2.models import (
 from yolov3_tf2.utils import (
     freeze_all,
     save_loss_plot,
-    randomHSV
+    randomHSV,
+    cropImages
 )
 import yolov3_tf2.dataset as dataset
 
 import os
 
-flags.DEFINE_string('dataset', './data/shrimp_mix/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/shrimp_mix/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('dataset', './data/microfield_5_v2/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/microfield_5_v2/valid.tfrecord', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('name', '20200204_1',
+flags.DEFINE_string('name', '20200218_1',
                     'path to weights name')
 flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
                     'path to weights file')
@@ -43,8 +44,8 @@ flags.DEFINE_enum('transfer', 'none',
                   'frozen: Transfer and freeze all, '
                   'fine_tune: Transfer all and freeze darknet only')
 flags.DEFINE_integer('size', 416, 'image size')
-flags.DEFINE_integer('epochs', 10, 'number of epochs')
-flags.DEFINE_integer('batch_size', 1, 'batch size')
+flags.DEFINE_integer('epochs', 100, 'number of epochs')
+flags.DEFINE_integer('batch_size', 32, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
@@ -145,6 +146,8 @@ def main(_argv):
         for epoch in range(1, FLAGS.epochs + 1):
             for batch, (images, labels) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
+                    # images = cropImages(images, labels, 0.3, anchors, anchor_masks)
+                    # images = randomHSV(images, 1.5, 1.5, 0.3)
                     outputs = model(images, training=True)
                     regularization_loss = tf.reduce_sum(model.losses)
                     pred_loss = []
@@ -162,6 +165,7 @@ def main(_argv):
                 avg_loss.update_state(total_loss)
 
             for batch, (images, labels) in enumerate(val_dataset):
+                images = randomHSV(images, 1.5, 1.5, 0.3)
                 outputs = model(images)
                 regularization_loss = tf.reduce_sum(model.losses)
                 pred_loss = []

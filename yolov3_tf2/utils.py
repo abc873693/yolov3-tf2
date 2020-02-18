@@ -2,7 +2,9 @@ from absl import logging
 import numpy as np
 import tensorflow as tf
 import cv2
+import random as random
 import matplotlib.pyplot as plt
+import yolov3_tf2.dataset as dataset
 
 YOLOV3_LAYER_LIST = [
     'yolo_darknet',
@@ -252,3 +254,127 @@ def randomHSV(images, saturation, exposure, hue):
     images = tf.image.hsv_to_rgb(hsv_images)
     images = tf.image.random_hue(image = images, max_delta = hue)
     return images
+
+def cropImages(images, labels, jitter, anchors, anchor_masks):
+    ow = images.shape[2]
+    oh = images.shape[1]
+    dw = (ow*jitter)
+    dh = (oh*jitter)
+    
+    pleft  = random.uniform(-dw, dw)
+    pright = random.uniform(-dw, dw)
+    ptop   = random.uniform(-dh, dh)
+    pbot   = random.uniform(-dh, dh)
+    
+    swidth =  ow - pleft - pright
+    sheight = oh - ptop - pbot
+    
+    sx = uniform_size(pleft, ow)
+    sy = uniform_size(ptop, oh)
+    ex = uniform_size(swidth + pleft, ow)
+    ey = uniform_size(sheight + ptop, oh)
+
+    images = tf.image.crop_to_bounding_box(
+        images,
+        int(sx),
+        int(sy),
+        int(ex) - int(sx),
+        int(ey) - int(sy)
+    )
+    
+    flip = random.random() %2
+
+    labels = fill_truth_detection(labels, sx, sy, ex, ey, ow, oh, flip, anchors, anchor_masks)
+
+    images = tf.image.resize(
+        images,
+        (oh,ow)
+    )
+
+    if(flip == 1):
+        images = tf.image.flip_left_right(images)
+
+    return images
+
+def uniform_size(target, origin):
+    if(target > origin):
+        return origin
+    if(target < 0):
+        return 0
+    return target
+
+def fill_truth_detection(labels, sx, sy, ex, ey, ow, oh, flip, anchors, anchor_masks):
+    nw = ex - sx
+    nh = ey - sy
+    
+    asw = nw / ow
+    ash = nh / oh
+
+    label1 , label2 = labels
+
+    batch_data = []
+    for batch in range(0, label1.shape[0]): #batch
+        boxes = []
+        for i in range(0, label1.shape[1]): #h
+            for j in range(0, label1.shape[2]): #w
+                for k in range(0, label1.shape[3]):
+                    box = label1[batch][i][j][k]
+                    nps = box.numpy()
+                    is_all_zero = not np.any(nps)
+                    if not is_all_zero:
+                        x1 = box[0].numpy()
+                        y1 = box[1].numpy()
+                        x2 = box[2].numpy()
+                        y2 = box[3].numpy()
+                        x1 = min(0.999, max(0, x1 * asw - sx / ow)) 
+                        y1 = min(0.999, max(0, y1 * ash - sy / oh)) 
+                        x2 = min(0.999, max(0, x2 * asw - sx / ow))
+                        y2 = min(0.999, max(0, y2 * ash - sy / oh))
+                        w = float(x2 - x1)
+                        h = float(y2 - y1)
+                        if w < 0.001 or h < 0.001:
+                            continue
+                        else:
+                            boxes.append([x1, y1, x2, y2, box[4].numpy(), box[5].numpy()])
+                            # print(box)
+        for i in range(0, label2.shape[1]): #h
+            for j in range(0, label2.shape[2]): #w
+                for k in range(0, label2.shape[3]):
+                    box = label2[batch][i][j][k]
+                    nps = box.numpy()
+                    is_all_zero = not np.any(nps)
+                    if not is_all_zero:
+                        x1 = box[0].numpy()
+                        y1 = box[1].numpy()
+                        x2 = box[2].numpy()
+                        y2 = box[3].numpy()
+                        x1 = min(0.999, max(0, x1 * asw - sx / ow)) 
+                        y1 = min(0.999, max(0, y1 * ash - sy / oh)) 
+                        x2 = min(0.999, max(0, x2 * asw - sx / ow))
+                        y2 = min(0.999, max(0, y2 * ash - sy / oh))
+                        w = float(x2 - x1)
+                        h = float(y2 - y1)
+                        if w < 0.001 or h < 0.001:
+                            continue
+                        else:
+                            if flip % 2 == 0:
+                                x1 = 0.999 - x1
+                                x2 = 0.999 - x2
+                            boxes.append([x1, y1, x2, y2, box[4].numpy(), box[5].numpy()])
+                            #print(box)
+        batch_data.append(boxes)
+    batch_data_pad = []
+    for batch in batch_data:
+        if len(batch) == 0:
+            batch.append([0, 0, 0, 0, 0, 0])
+        paddings = [[0, 100 - len(batch)], [0, 0]]
+        batch_tf = tf.convert_to_tensor(batch)
+        batch_tf = tf.pad(batch_tf, paddings)
+        boxes = batch_tf.numpy()
+        batch_data_pad.append(boxes)
+    labels_np = np.array(batch_data_pad)
+    labels_tf = tf.convert_to_tensor(labels_np, dtype = tf.float32)
+    labels = dataset.transform_targets(labels_tf, anchors, anchor_masks, 1)
+    labels_np1 = labels[0].numpy() 
+    labels_np2 = labels[1].numpy() 
+    return labels
