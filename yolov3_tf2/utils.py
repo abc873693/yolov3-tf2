@@ -310,7 +310,13 @@ def fill_truth_detection(labels, sx, sy, ex, ey, ow, oh, flip, anchors, anchor_m
     asw = nw / ow
     ash = nh / oh
 
+    sx_nor = sx / ow
+    sy_nor = sy / oh
+
     label1 , label2 = labels
+
+    num_max = tf.constant(0.999)
+    num_min = tf.constant(0.)
 
     batch_data = []
     for batch in range(0, label1.shape[0]): #batch
@@ -326,10 +332,14 @@ def fill_truth_detection(labels, sx, sy, ex, ey, ow, oh, flip, anchors, anchor_m
                         y1 = box[1].numpy()
                         x2 = box[2].numpy()
                         y2 = box[3].numpy()
-                        x1 = min(0.999, max(0, x1 * asw - sx / ow)) 
-                        y1 = min(0.999, max(0, y1 * ash - sy / oh)) 
-                        x2 = min(0.999, max(0, x2 * asw - sx / ow))
-                        y2 = min(0.999, max(0, y2 * ash - sy / oh))
+                        x1 = min(0.999, max(0, x1 * asw - sx_nor)) 
+                        y1 = min(0.999, max(0, y1 * ash - sy_nor)) 
+                        x2 = min(0.999, max(0, x2 * asw - sx_nor))
+                        y2 = min(0.999, max(0, y2 * ash - sy_nor))
+                        # x1_tf = tf.math.minimum(num_max, tf.math.maximum(num_min, box[0] * asw - sx_nor))
+                        # y1_tf = tf.math.minimum(num_max, tf.math.maximum(num_min, box[1] * ash - sy_nor))
+                        # x2_tf = tf.math.minimum(num_max, tf.math.maximum(num_min, box[2] * asw - sx_nor))
+                        # y2_tf = tf.math.minimum(num_max, tf.math.maximum(num_min, box[3] * ash - sy_nor))
                         w = float(x2 - x1)
                         h = float(y2 - y1)
                         if w < 0.001 or h < 0.001:
@@ -348,10 +358,10 @@ def fill_truth_detection(labels, sx, sy, ex, ey, ow, oh, flip, anchors, anchor_m
                         y1 = box[1].numpy()
                         x2 = box[2].numpy()
                         y2 = box[3].numpy()
-                        x1 = min(0.999, max(0, x1 * asw - sx / ow)) 
-                        y1 = min(0.999, max(0, y1 * ash - sy / oh)) 
-                        x2 = min(0.999, max(0, x2 * asw - sx / ow))
-                        y2 = min(0.999, max(0, y2 * ash - sy / oh))
+                        x1 = min(0.999, max(0, x1 * asw - sx_nor)) 
+                        y1 = min(0.999, max(0, y1 * ash - sy_nor)) 
+                        x2 = min(0.999, max(0, x2 * asw - sx_nor))
+                        y2 = min(0.999, max(0, y2 * ash - sy_nor))
                         w = float(x2 - x1)
                         h = float(y2 - y1)
                         if w < 0.001 or h < 0.001:
@@ -375,6 +385,4 @@ def fill_truth_detection(labels, sx, sy, ex, ey, ow, oh, flip, anchors, anchor_m
     labels_np = np.array(batch_data_pad)
     labels_tf = tf.convert_to_tensor(labels_np, dtype = tf.float32)
     labels = dataset.transform_targets(labels_tf, anchors, anchor_masks, 1)
-    labels_np1 = labels[0].numpy() 
-    labels_np2 = labels[1].numpy() 
     return labels
