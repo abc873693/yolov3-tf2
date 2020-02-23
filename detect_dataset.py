@@ -114,8 +114,14 @@ def main(_argv):
     are = 0
     if len(REs) != 0:
         are = sum(REs) / len(REs)
-    precision = TP_total / (TP_total + FP_total)
-    recall = TP_total / (TP_total + FN_total)
+    if((TP_total + FP_total) != 0):
+        precision = TP_total / (TP_total + FP_total)
+    else :
+        precision = 0.0
+    if((TP_total + FN_total) != 0):
+        recall = TP_total / (TP_total + FN_total)
+    else :
+        recall = 0.0
     results_text = open('records.txt', "a")
     results_text.write('{},{},{},{:.2f}%,{:.2f}%,{:.2f}%\n'.format(TP_total, FP_total, FN_total, precision * 100.0, recall * 100.0, are * 100.0))
     logging.info('TP = {} FP = {} FN = {}'.format(TP_total, FP_total, FN_total))
