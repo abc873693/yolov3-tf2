@@ -1,6 +1,7 @@
 from absl import app, flags, logging
 from absl.flags import FLAGS
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
 import cv2
 from tensorflow.keras.callbacks import (
@@ -24,8 +25,8 @@ import yolov3_tf2.dataset as dataset
 
 import os
 
-flags.DEFINE_string('dataset', './data/microfield_5_v2/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/microfield_5_v2/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('dataset', './data/shrimp_mix/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/shrimp_mix/valid.tfrecord', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_string('name', '20200218_1',
                     'path to weights name')
@@ -125,7 +126,17 @@ def main(_argv):
                     else:
                         freeze_all(l)
 
-    optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+    # optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+    step = tf.Variable(0, trainable=False)
+    schedule = tf.optimizers.schedules.PiecewiseConstantDecay(
+        [400, 450], [1e-3, 1e-4, 1e-5])
+    # lr and wd can be a function or a tensor
+    lr = 1e-0 * schedule(step)
+    wd = lambda: 1e-0 * schedule(step)
+
+    optimizer = tfa.optimizers.SGDW(
+        learning_rate=lr, weight_decay=wd, momentum=0.9)
+        
     loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
             for mask in anchor_masks]
 
