@@ -191,15 +191,15 @@ def yolo_nms(outputs, anchors, masks, classes):
     class_probs = tf.concat(t, axis=1)
 
     scores = confidence * class_probs
-    boxes, scores_nms, classes, valid_detections = tf.image.combined_non_max_suppression(
-        boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
-        scores=tf.reshape(
-            scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
-        max_output_size_per_class=100,
-        max_total_size=100,
-        iou_threshold=FLAGS.yolo_iou_threshold,
-        score_threshold=FLAGS.yolo_score_threshold
-    )
+    # boxes, scores_nms, classes, valid_detections = tf.image.combined_non_max_suppression(
+    #     boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
+    #     scores=tf.reshape(
+    #         scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
+    #     max_output_size_per_class=100,
+    #     max_total_size=100,
+    #     iou_threshold=FLAGS.yolo_iou_threshold,
+    #     score_threshold=FLAGS.yolo_score_threshold
+    # )
 
     bbox_size = bbox.shape[1]
         # print(tf.slice(i,[0,0,0],[0,-1,4]))
