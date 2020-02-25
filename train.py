@@ -157,8 +157,19 @@ def main(_argv):
         for epoch in range(1, FLAGS.epochs + 1):
             for batch, (images, labels) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
-                    # images = cropImages(images, labels, 0.3, anchors, anchor_masks)
-                    # images = randomHSV(images, 1.5, 1.5, 0.3)
+                    images = cropImages(images, labels, 0.3, anchors, anchor_masks)
+                    # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
+                    # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
+                    # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
+                    # images = tfa.image.random_hsv_in_yiq(
+                    #     images,
+                    #     max_delta_hue=0.3,
+                    #     lower_saturation=1/1.5,
+                    #     upper_saturation=1.5,
+                    #     lower_value=1/1.5,
+                    #     upper_value=1.5,
+                    # )
+                    images = randomHSV(images, 1.5, 1.5, 0.3)
                     outputs = model(images, training=True)
                     regularization_loss = tf.reduce_sum(model.losses)
                     pred_loss = []
@@ -176,6 +187,18 @@ def main(_argv):
                 avg_loss.update_state(total_loss)
 
             for batch, (images, labels) in enumerate(val_dataset):
+                images = cropImages(images, labels, 0.3, anchors, anchor_masks)
+                # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
+                # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
+                # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
+                # images = tfa.image.random_hsv_in_yiq(
+                #     images,
+                #     max_delta_hue=0.3,
+                #     lower_saturation=1/1.5,
+                #     upper_saturation=1.5,
+                #     lower_value=1/1.5,
+                #     upper_value=1.5,
+                # )
                 images = randomHSV(images, 1.5, 1.5, 0.3)
                 outputs = model(images)
                 regularization_loss = tf.reduce_sum(model.losses)
