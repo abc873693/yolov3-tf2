@@ -126,16 +126,17 @@ def main(_argv):
                     else:
                         freeze_all(l)
 
-    # optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+    # optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
     step = tf.Variable(0, trainable=False)
     schedule = tf.optimizers.schedules.PiecewiseConstantDecay(
-        [400, 450], [1e-3, 1e-4, 1e-5])
+        [200000, 225000], [1e-0, 1e-1, 1e-2])
     # lr and wd can be a function or a tensor
-    lr = 1e-0 * schedule(step)
-    wd = lambda: 1e-0 * schedule(step)
+    lr = 1e-3 * schedule(step)
+    wd = lambda: 5e-3 * schedule(step)
 
-    optimizer = tfa.optimizers.SGDW(
-        learning_rate=lr, weight_decay=wd, momentum=0.9)
+    optimizer = tfa.optimizers.AdamW(
+        learning_rate=lr, weight_decay=wd)
+    # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
         
     loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
             for mask in anchor_masks]
@@ -157,7 +158,7 @@ def main(_argv):
         for epoch in range(1, FLAGS.epochs + 1):
             for batch, (images, labels) in enumerate(train_dataset):
                 with tf.GradientTape() as tape:
-                    images = cropImages(images, labels, 0.3, anchors, anchor_masks)
+                    # images = cropImages(images, labels, 0.3, anchors, anchor_masks)
                     # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                     # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                     # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
@@ -187,7 +188,7 @@ def main(_argv):
                 avg_loss.update_state(total_loss)
 
             for batch, (images, labels) in enumerate(val_dataset):
-                images = cropImages(images, labels, 0.3, anchors, anchor_masks)
+                # images = cropImages(images, labels, 0.3, anchors, anchor_masks)
                 # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                 # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                 # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
