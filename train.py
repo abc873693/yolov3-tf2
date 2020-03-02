@@ -129,14 +129,13 @@ def main(_argv):
     # optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
     step = tf.Variable(0, trainable=False)
     schedule = tf.optimizers.schedules.PiecewiseConstantDecay(
-        [200000, 225000], [1e-0, 1e-1, 1e-2])
+        [40000, 45000], [1e-0, 1e-1, 1e-2])
     # lr and wd can be a function or a tensor
-    lr = 1e-3 * schedule(step)
-    wd = lambda: 5e-3 * schedule(step)
+    lr = 1e-4  * schedule(step)
+    wd = lambda: 5e-4 * schedule(step)
 
-    optimizer = tfa.optimizers.AdamW(
+    optimizer = tfa.optimizers.SGDW(
         learning_rate=lr, weight_decay=wd)
-    # optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
         
     loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
             for mask in anchor_masks]
@@ -162,15 +161,15 @@ def main(_argv):
                     # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                     # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                     # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                    # images = tfa.image.random_hsv_in_yiq(
-                    #     images,
-                    #     max_delta_hue=0.3,
-                    #     lower_saturation=1/1.5,
-                    #     upper_saturation=1.5,
-                    #     lower_value=1/1.5,
-                    #     upper_value=1.5,
-                    # )
-                    images = randomHSV(images, 1.5, 1.5, 0.3)
+                    images = tfa.image.random_hsv_in_yiq(
+                        images,
+                        max_delta_hue=0.1,
+                        lower_saturation=1/1.5,
+                        upper_saturation=1.5,
+                        lower_value=1/1.5,
+                        upper_value=1.5,
+                    )
+                    # images = randomHSV(images, 1.5, 1.5, 0.3)
                     outputs = model(images, training=True)
                     regularization_loss = tf.reduce_sum(model.losses)
                     pred_loss = []
@@ -192,15 +191,15 @@ def main(_argv):
                 # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                 # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                 # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                # images = tfa.image.random_hsv_in_yiq(
-                #     images,
-                #     max_delta_hue=0.3,
-                #     lower_saturation=1/1.5,
-                #     upper_saturation=1.5,
-                #     lower_value=1/1.5,
-                #     upper_value=1.5,
-                # )
-                images = randomHSV(images, 1.5, 1.5, 0.3)
+                images = tfa.image.random_hsv_in_yiq(
+                    images,
+                    max_delta_hue=0.1,
+                    lower_saturation=1/1.5,
+                    upper_saturation=1.5,
+                    lower_value=1/1.5,
+                    upper_value=1.5,
+                )
+                # images = randomHSV(images, 1.5, 1.5, 0.3)
                 outputs = model(images)
                 regularization_loss = tf.reduce_sum(model.losses)
                 pred_loss = []
