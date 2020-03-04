@@ -20,7 +20,14 @@ from tensorflow.keras.losses import (
     sparse_categorical_crossentropy
 )
 from .batch_norm import BatchNormalization
-from .utils import broadcast_iou
+from .utils import (
+    broadcast_iou,
+    read_yolo_labels,
+    yolo_extend_evaluate
+)
+from .dataset import transform_images
+
+import os
 
 flags.DEFINE_float('yolo_iou_threshold', 0.5, 'iou threshold')
 flags.DEFINE_float('yolo_score_threshold', 0.25, 'score threshold')
@@ -183,8 +190,8 @@ def yolo_nms(outputs, anchors, masks, classes):
         c.append(tf.reshape(o[2], (tf.shape(o[2])[0], -1, tf.shape(o[2])[-1])))
         t.append(tf.reshape(o[3], (tf.shape(o[3])[0], -1, tf.shape(o[3])[-1])))
     
-    for i in range(0,len(b)):
-        print('{} {} {} {}'.format(b[i].shape,s[i].shape , c[i].shape,t[i].shape))
+    # for i in range(0,len(b)):
+    #     print('{} {} {} {}'.format(b[i].shape,s[i].shape , c[i].shape,t[i].shape))
     bbox = tf.concat(b, axis=1)
     size = tf.concat(s, axis=1)
     confidence = tf.concat(c, axis=1)
@@ -350,6 +357,71 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
                      name='yolo_nms')((boxes_0[:4], boxes_1[:4]))
     return Model(inputs, outputs, name='yolov3_tiny')
 
+def calculateMap(yolo, input_path):
+
+    image_count = 0
+    label_count = 0
+
+    REs = []
+
+    TP_total, FP_total, FN_total = 0, 0, 0
+
+    for file_name in os.listdir(input_path):
+        if file_name.find('.jpg') == -1:
+            continue
+        image_path = input_path + file_name
+
+        image_count += 1
+
+        img = tf.image.decode_image(open(image_path, 'rb').read(), channels=3)
+        img = tf.expand_dims(img, 0)
+        img = transform_images(img, FLAGS.size)
+
+        out1, out2 = yolo(img)
+        boxes, sizes, scores, classes , nums = tinyEnd(out1, out2)
+        
+        label_filename = file_name.replace('.jpg','.txt')
+        label_path = input_path + label_filename
+        if os.path.exists(label_path):
+            label_count += 1
+            # labels np array [class_id, center_x, center_y, width, height, size]
+            labels, has_size_label, labels_nums = read_yolo_labels(label_path)
+            classes_true = labels[ : , 0]
+            boxes_ture = labels[ : , 1:5]
+            size_ture = np.array([])
+
+            if has_size_label:
+                size_ture = labels[: , 5]
+            outputs = (boxes, sizes , scores, classes, nums)
+            grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
+            TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth , FLAGS.yolo_iou_threshold)
+            TP_total += TP
+            FP_total += FP
+            FN_total += FN
+            REs.extend(RE)
+
+    are = 100.0
+    if len(REs) != 0:
+        are = sum(REs) / len(REs)
+    if((TP_total + FP_total) != 0):
+        precision = TP_total / (TP_total + FP_total)
+    else :
+        precision = 0.0
+    if((TP_total + FN_total) != 0):
+        recall = TP_total / (TP_total + FN_total)
+    else :
+        recall = 0.0
+    return precision, recall, are
+
+def tinyEnd(output_0, output_1 ,anchors=yolo_tiny_anchors,
+               masks=yolo_tiny_anchor_masks, classes=1):
+    boxes_0 = Lambda(lambda x: yolo_boxes(x, anchors[masks[0]], classes),
+                     name='yolo_boxes_0')(output_0)
+    boxes_1 = Lambda(lambda x: yolo_boxes(x, anchors[masks[1]], classes),
+                     name='yolo_boxes_1')(output_1)
+    outputs = Lambda(lambda x: yolo_nms(x, anchors, masks, classes),
+                     name='yolo_nms')((boxes_0[:4], boxes_1[:4]))
+    return outputs
 
 @tf.function
 def minus_if_zero(a, b):

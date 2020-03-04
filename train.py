@@ -13,7 +13,8 @@ from tensorflow.keras.callbacks import (
 from yolov3_tf2.models import (
     YoloV3, YoloV3Tiny, YoloLoss,
     yolo_anchors, yolo_anchor_masks,
-    yolo_tiny_anchors, yolo_tiny_anchor_masks
+    yolo_tiny_anchors, yolo_tiny_anchor_masks, calculateMap
+
 )
 from yolov3_tf2.utils import (
     freeze_all,
@@ -27,8 +28,9 @@ import os
 
 flags.DEFINE_string('dataset', './data/shrimp_mix/train.tfrecord', 'path to dataset')
 flags.DEFINE_string('val_dataset', './data/shrimp_mix/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('test_dataset_path', './data/microfield_5_v2_test/', 'path to test dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('name', '20200218_1',
+flags.DEFINE_string('name', '20200304_1',
                     'path to weights name')
 flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
                     'path to weights file')
@@ -148,6 +150,9 @@ def main(_argv):
 
         loss_records = []
         loss_val_records = []
+        precision_records = []
+        recall_records = []
+        relative_error_records = []
         
         loss_best = 10000000.0
         loss_best_epochs = 0
@@ -218,10 +223,19 @@ def main(_argv):
             loss_records.append(train_loss)
             loss_val_records.append(val_loss)
 
-            logging.info("{}, train: {}, val: {}".format(
+            precision, recall, ARE = calculateMap(model, FLAGS.test_dataset_path)
+            
+            precision_records.append(precision)
+            recall_records.append(recall)
+            relative_error_records.append(ARE)
+
+            logging.info("{}, train: {}, val: {}, precision: {}, recall: {}, relative error: {}".format(
                 epoch,
                 train_loss,
-                val_loss))
+                val_loss,
+                precision,
+                recall,
+                ARE))
             
             loss_text = open('{}loss.txt'.format(weight_base_dir), "a")
             loss_text.write('{},{}\n'.format(avg_loss.result().numpy(), avg_val_loss.result().numpy()))
@@ -244,7 +258,7 @@ def main(_argv):
             if epoch % 10 == 0:
                 model.save_weights(
                     '{}yolov3_train_{}.tf'.format(weight_base_dir, epoch))
-            save_loss_plot(train_loss = loss_records,val_loss = loss_val_records, save_path='{}loss.png'.format(weight_base_dir))
+            save_loss_plot(train_loss = loss_records,val_loss = loss_val_records,precision=precision_records, recall = recall_records, are = relative_error_records, save_path='{}loss.png'.format(weight_base_dir))
             model.save_weights(
                     '{}yolov3_train_last.tf'.format(weight_base_dir))
             if epoch == FLAGS.epochs:

@@ -235,13 +235,28 @@ def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
     # logging.info('TP = {} FP = {}, size average ralative error = {}'.format(TP, FP, are))
     return TP, FP, (nums_ture - TP), size_errors
 
-def save_loss_plot(train_loss = [], val_loss = [], precision = [],save_path = './loss.png'):
-    plt.plot(train_loss)
-    plt.plot(val_loss)
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'valid'], loc='upper left')
+def save_loss_plot(train_loss = [], val_loss = [], precision = [], recall = [],are = [] ,save_path = './loss.png'):
+    fig, ax1 = plt.subplots()
+
+    ax1.set_xlabel('epoch')
+    ax1.set_ylabel('loss')
+    ax1.plot(train_loss, 'y')
+    ax1.plot(val_loss, 'c')
+
+    ax2 = ax1.twinx()
+
+    ax2.plot(precision, 'r')
+    ax2.plot(recall, 'g')
+    ax2.plot(are, 'b')
+
+    ax2.set_ylabel('%')  # we already handled the x-label with ax1
+    fig.tight_layout() 
+
+    # plt.title('model loss')
+    # plt.ylabel('loss')
+    # plt.xlabel('epoch')
+    ax1.legend(['train', 'valid'], loc='upper left')
+    ax2.legend(['precision', 'recall', 'relative error'], loc='upper right')
     plt.savefig(save_path, dpi=100)
     plt.clf()
         
@@ -390,3 +405,4 @@ def fill_truth_detection(labels, sx, sy, ex, ey, ow, oh, flip, anchors, anchor_m
     labels_tf = tf.convert_to_tensor(labels_np, dtype = tf.float32)
     labels = dataset.transform_targets(labels_tf, anchors, anchor_masks, 1)
     return labels
+
