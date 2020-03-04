@@ -194,6 +194,7 @@ def read_yolo_labels(label_path):
                 size = float(array[5])
             else:
                 has_size_label = False
+                size = float(0.5)
             x1 = center_x - width / 2.0  # xmin
             x2 = center_x + width / 2.0  # xmax
             y1 = center_y - height / 2.0  # ymin
@@ -221,7 +222,10 @@ def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
             FP += 1
         else:
             TP += 1
-            size_ralative_error = abs(sizes[i] - sizes_ture[index]) / sizes_ture[index]
+            if(len(sizes_ture) == 0):
+                size_ralative_error = 1.0
+            else:
+                size_ralative_error = abs(sizes[i] - sizes_ture[index]) / sizes_ture[index]
             # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
             # logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(sizes[i],sizes_ture[index], size_ralative_error))
             size_errors.append(size_ralative_error)
