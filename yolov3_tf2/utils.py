@@ -118,12 +118,29 @@ def draw_outputs(img, outputs, class_names):
         #     x1y1, cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 1)
         cv2.putText(img,'{} {:.4f}%'.format(class_names[int(classes[i])], objectness[i]),
                     end, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    [0, 255, 0], 2)
+                    rectangleColor, 2)
         cv2.putText(img,'size = {:.4f}'.format(sizes[i]),
                     x1y1, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    [0, 255, 0], 2)
+                    rectangleColor, 2)
     return img
 
+def draw_gt(img, outputs, class_names):
+    boxes, sizes, classes, nums = outputs
+    wh = np.flip(img.shape[0:2])
+    for i in range(nums):
+        x1y1 = tuple((np.array(boxes[i][0:2]) * wh).astype(np.int32))
+        x2y2 = tuple((np.array(boxes[i][2:4]) * wh).astype(np.int32))
+        rectangleColor = [255, 255, 0]
+        end = (x1y1[0], x1y1[1] + 20)
+        img = cv2.rectangle(img, x1y1, x2y2, rectangleColor, 1)
+        # img = cv2.rectangle(img, x1y1, end, rectangleColor, cv2.FILLED)
+        # img = cv2.putText(img, '{} {:.4f}'.format(
+        #     class_names[int(classes[i])], objectness[i]),
+        #     x1y1, cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 1)
+        cv2.putText(img,'size = {:.4f}'.format(sizes[i]),
+                    end, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                    rectangleColor, 2)
+    return img
 
 def draw_labels(x, y, class_names):
     img = x.numpy()

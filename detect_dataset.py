@@ -9,21 +9,22 @@ from yolov3_tf2.models import (
     YoloV3, YoloV3Tiny
 )
 from yolov3_tf2.dataset import transform_images
-from yolov3_tf2.utils import (draw_outputs, read_yolo_labels, yolo_extend_evaluate)
+from yolov3_tf2.utils import (draw_outputs, draw_gt, read_yolo_labels, yolo_extend_evaluate)
 
 flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
 flags.DEFINE_string('weights_postfix', 'last', 'path to weights postfix')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_boolean('map', False, 'calculate')
+flags.DEFINE_boolean('map', True, 'calculate')
 flags.DEFINE_float('iou_trethold', 0.5, 'iou_trethold')
 flags.DEFINE_integer('size', 416, 'resize images to')
-flags.DEFINE_string('experiment', '20200109_2', 'path to dataset')
-flags.DEFINE_string('dataset', 'microfield_5_v2_test', 'path to dataset')
+flags.DEFINE_string('experiment', '20200326_2', 'path to dataset')
+flags.DEFINE_string('dataset', 'microfield_monocular_train', 'path to dataset')
 # flags.DEFINE_string('output_path', 'output/', 'path to output path')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
 
 def main(_argv):
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -105,6 +106,8 @@ def main(_argv):
                     size_ture = labels[: , 5]
                 outputs = (boxes, sizes , scores, classes, nums)
                 grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
+                img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
+                cv2.imwrite(output_path , img)
                 TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth , FLAGS.iou_trethold)
                 TP_total += TP
                 FP_total += FP
