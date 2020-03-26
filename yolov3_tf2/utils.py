@@ -191,6 +191,23 @@ def compute_iou(rec1, rec2):
         intersect = (right_line - left_line) * (bottom_line - top_line)
         return (intersect / (sum_area - intersect))*1.0
 
+# TODO overflow covert 
+def size_normalize(size):
+    if size > 7.0:
+       return 0.9
+    elif size < 1.0:
+       return 0.1
+    else:
+       return (size - 0.25) / 7.5
+
+def size_normalize_revert(x):
+    if x > 0.9:
+       return 7.0
+    elif x < 0.1:
+       return 1.0
+    else:
+        return (7.5 * x + 0.25)
+
 def read_yolo_labels(label_path):
     label_text = open(label_path, "r")
     labels = []
@@ -209,6 +226,8 @@ def read_yolo_labels(label_path):
             height = float(array[4])
             if len(array) >= 6:
                 size = float(array[5])
+                if size > 1.0:
+                    size = size_normalize(size)
             else:
                 has_size_label = False
                 size = float(0.5)

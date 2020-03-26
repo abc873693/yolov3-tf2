@@ -24,6 +24,8 @@ import hashlib
 from absl import app, flags, logging
 from absl.flags import FLAGS
 
+from yolov3_tf2.utils import size_normalize
+
 flags.DEFINE_string('text_input_path', 'train.txt',
                     'Path to the yolo label path list input')
 flags.DEFINE_string('output_path', 'train.tfrecord', 'Path to output TFRecord')
@@ -73,7 +75,8 @@ def create_tf_example(imagePath):
             width = float(array[3])
             height = float(array[4])
             if len(array) >= 6:
-                size = float(array[5])
+                size = size_normalize(float(array[5]))
+                print('before: {} after: {}'.format(array[5], size))
             else:
                 size = 0.0
             xmins.append(center_x - width / 2.0)  # xmin
