@@ -26,9 +26,9 @@ import yolov3_tf2.dataset as dataset
 
 import os
 
-flags.DEFINE_string('dataset', './data/shrimp_mix/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/shrimp_mix/valid.tfrecord', 'path to validation dataset')
-flags.DEFINE_string('test_dataset_path', './data/microfield_5_v2_test/', 'path to test dataset')
+flags.DEFINE_string('dataset', './data/microfield_monocular_v2/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/microfield_monocular_v2/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('test_dataset_path', './data/microfield_monocular_test/', 'path to test dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_string('name', '20200304_1',
                     'path to weights name')
@@ -128,16 +128,16 @@ def main(_argv):
                     else:
                         freeze_all(l)
 
-    # optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
-    step = tf.Variable(0, trainable=False)
-    schedule = tf.optimizers.schedules.PiecewiseConstantDecay(
-        [40000, 45000], [1e-0, 1e-1, 1e-2])
-    # lr and wd can be a function or a tensor
-    lr = 1e-4  * schedule(step)
-    wd = lambda: 5e-4 * schedule(step)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
+    # step = tf.Variable(0, trainable=False)
+    # schedule = tf.optimizers.schedules.PiecewiseConstantDecay(
+    #     [100000, 112500], [1e-0, 1e-1, 1e-2])
+    # # lr and wd can be a function or a tensor
+    # lr = 1e-4  * schedule(step)
+    # wd = lambda: 5e-4 * schedule(step)
 
-    optimizer = tfa.optimizers.SGDW(
-        learning_rate=lr, weight_decay=wd)
+    # optimizer = tfa.optimizers.SGDW(
+    #     learning_rate=lr, weight_decay=wd)
         
     loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
             for mask in anchor_masks]
@@ -166,14 +166,14 @@ def main(_argv):
                     # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                     # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                     # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                    images = tfa.image.random_hsv_in_yiq(
-                        images,
-                        max_delta_hue=0.1,
-                        lower_saturation=1/1.5,
-                        upper_saturation=1.5,
-                        lower_value=1/1.5,
-                        upper_value=1.5,
-                    )
+                    # images = tfa.image.random_hsv_in_yiq(
+                    #     images,
+                    #     max_delta_hue=0.1,
+                    #     lower_saturation=1/1.5,
+                    #     upper_saturation=1.5,
+                    #     lower_value=1/1.5,
+                    #     upper_value=1.5,
+                    # )
                     # images = randomHSV(images, 1.5, 1.5, 0.3)
                     outputs = model(images, training=True)
                     regularization_loss = tf.reduce_sum(model.losses)
@@ -196,14 +196,14 @@ def main(_argv):
                 # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                 # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                 # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                images = tfa.image.random_hsv_in_yiq(
-                    images,
-                    max_delta_hue=0.1,
-                    lower_saturation=1/1.5,
-                    upper_saturation=1.5,
-                    lower_value=1/1.5,
-                    upper_value=1.5,
-                )
+                # images = tfa.image.random_hsv_in_yiq(
+                #     images,
+                #     max_delta_hue=0.1,
+                #     lower_saturation=1/1.5,
+                #     upper_saturation=1.5,
+                #     lower_value=1/1.5,
+                #     upper_value=1.5,
+                # )
                 # images = randomHSV(images, 1.5, 1.5, 0.3)
                 outputs = model(images)
                 regularization_loss = tf.reduce_sum(model.losses)

@@ -3,6 +3,7 @@ from absl.flags import FLAGS
 import numpy as np
 from yolov3_tf2.models import YoloV3, YoloV3Tiny
 from yolov3_tf2.utils import load_darknet_weights
+import os
 
 flags.DEFINE_string('weights', './data/yolov3.weights', 'path to weights file')
 flags.DEFINE_string('output', './checkpoints/yolov3.tf', 'path to output')
@@ -11,6 +12,7 @@ flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
 
 
 def main(_argv):
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     if FLAGS.tiny:
         yolo = YoloV3Tiny(classes=FLAGS.num_classes)
     else:
