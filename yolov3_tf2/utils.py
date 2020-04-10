@@ -119,7 +119,7 @@ def draw_outputs(img, outputs, class_names):
         cv2.putText(img,'{} {:.4f}%'.format(class_names[int(classes[i])], objectness[i]),
                     end, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     rectangleColor, 2)
-        cv2.putText(img,'size = {:.4f}'.format(sizes[i]),
+        cv2.putText(img,'predict = {:.4f}cm'.format(size_normalize_revert(sizes[i])),
                     x1y1, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     rectangleColor, 2)
     return img
@@ -137,7 +137,7 @@ def draw_gt(img, outputs, class_names):
         # img = cv2.putText(img, '{} {:.4f}'.format(
         #     class_names[int(classes[i])], objectness[i]),
         #     x1y1, cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 1)
-        cv2.putText(img,'size = {:.4f}'.format(sizes[i]),
+        cv2.putText(img,'gt = {:.4f}cm'.format(size_normalize_revert(sizes[i])),
                     end, cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     rectangleColor, 2)
     return img
@@ -261,9 +261,11 @@ def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
             if(len(sizes_ture) == 0):
                 size_ralative_error = 1.0
             else:
-                size_ralative_error = abs(sizes[i] - sizes_ture[index]) / sizes_ture[index]
+                predit = size_normalize_revert(sizes[i])
+                ground_trueth = size_normalize_revert(sizes_ture[index])
+                size_ralative_error = abs(predit - ground_trueth) / ground_trueth
             # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
-            # logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(sizes[i],sizes_ture[index], size_ralative_error))
+            logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(predit ,ground_trueth, size_ralative_error))
             size_errors.append(size_ralative_error)
     are = 0
     if len(size_errors) != 0:
