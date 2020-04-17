@@ -51,6 +51,8 @@ flags.DEFINE_integer('epochs', 100, 'number of epochs')
 flags.DEFINE_integer('batch_size', 32, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
+flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weights` file if different, '
+                     'useful in transfer learning with different number of classes')
 
 #python3 train.py --batch_size 8 --dataset ./microfield_4_train.tfrecord --val_dataset ~/Data/voc2012_val.tfrecord --epochs 10 --mode eager_fit --transfer fine_tune --weights ./checkpoints/yolov3-tiny.tf --tiny
 def main(_argv):
@@ -95,38 +97,44 @@ def main(_argv):
         dataset.transform_images(x, FLAGS.size),
         dataset.transform_targets(y, anchors, anchor_masks, 1)))
 
-    if FLAGS.transfer != 'none':
-        # model.load_weights(FLAGS.weights)
-        if FLAGS.transfer == 'fine_tune':
-            # freeze darknet
+        # Configure the model for transfer learning
+    if FLAGS.transfer == 'none':
+        pass  # Nothing to do
+    elif FLAGS.transfer in ['darknet', 'no_output']:
+        # Darknet transfer is a special case that works
+        # with incompatible number of classes
+
+        # reset top layers
+        if FLAGS.tiny:
+            model_pretrained = YoloV3Tiny(
+                FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+        else:
+            model_pretrained = YoloV3(
+                FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+        model_pretrained.load_weights(FLAGS.weights)
+
+        if FLAGS.transfer == 'darknet':
+            model.get_layer('yolo_darknet').set_weights(
+                model_pretrained.get_layer('yolo_darknet').get_weights())
+            freeze_all(model.get_layer('yolo_darknet'))
+
+        elif FLAGS.transfer == 'no_output':
+            for l in model.layers:
+                if not l.name.startswith('yolo_output'):
+                    l.set_weights(model_pretrained.get_layer(
+                        l.name).get_weights())
+                    freeze_all(l)
+
+    else:
+        # All other transfer require matching classes
+        model.load_weights(FLAGS.weights)
+        if FLAGS.transfer =:
+            # freeze darknet and fine tune other layers
             darknet = model.get_layer('yolo_darknet')
             freeze_all(darknet)
         elif FLAGS.transfer == 'frozen':
             # freeze everything
             freeze_all(model)
-        else:
-            # reset top layers
-            if FLAGS.tiny:  # get initial weights
-                init_model = YoloV3Tiny(
-                    FLAGS.size, training=True, classes=FLAGS.num_classes)
-            else:
-                init_model = YoloV3(
-                    FLAGS.size, training=True, classes=FLAGS.num_classes)
-
-            if FLAGS.transfer == 'darknet':
-                for l in model.layers:
-                    if l.name != 'yolo_darknet' and l.name.startswith('yolo_'):
-                        l.set_weights(init_model.get_layer(
-                            l.name).get_weights())
-                    else:
-                        freeze_all(l)
-            elif FLAGS.transfer == 'no_output':
-                for l in model.layers:
-                    if l.name.startswith('yolo_output'):
-                        l.set_weights(init_model.get_layer(
-                            l.name).get_weights())
-                    else:
-                        freeze_all(l)
 
     optimizer = tf.keras.optimizers.Adam(learning_rate=FLAGS.learning_rate)
     # step = tf.Variable(0, trainable=False)
@@ -238,7 +246,11 @@ def main(_argv):
                 ARE))
             
             loss_text = open('{}loss.txt'.format(weight_base_dir), "a")
-            loss_text.write('{},{}\n'.format(avg_loss.result().numpy(), avg_val_loss.result().numpy()))
+            loss_text.write('{},{},{},{},{}\n'.format(train_loss,
+                val_loss,
+                precision,
+                recall,
+                ARE))
             loss_text.close()
 
             if train_loss < loss_best:
