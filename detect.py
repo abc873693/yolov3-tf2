@@ -22,7 +22,7 @@ flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
 
 def main(_argv):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
