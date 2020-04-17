@@ -235,7 +235,7 @@ def yolo_nms(outputs, anchors, masks, classes):
     picked_score = tf.reshape(tf.convert_to_tensor(picked_score, tf.float32),(1,-1))
        
     return picked_boxes, picked_size , picked_score, classes, valid_detections
-    
+
 def YoloV3(size=None, channels=3, anchors=yolo_anchors,
            masks=yolo_anchor_masks, classes=80, training=False):
     x = inputs = Input([size, size, channels])
@@ -368,7 +368,7 @@ def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
         # 1. transform all pred outputs
         # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, size, obj, ...cls))
         # bbox, size, objectness, class_probs, pred_box
-        pred_box, pre_size, pred_obj, pred_class, pred_xywh = yolo_boxes(
+        pred_box, pred_obj, pred_class, pre_size, pred_xywh = yolo_boxes(
             y_pred, anchors, classes)
         pred_xy = pred_xywh[..., 0:2]
         pred_wh = pred_xywh[..., 2:4]
