@@ -12,11 +12,11 @@ from yolov3_tf2.dataset import transform_images
 from yolov3_tf2.utils import draw_outputs
 
 flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
-flags.DEFINE_string('weights', './checkpoints/yolov3_train_80.tf',
+flags.DEFINE_string('weights', './checkpoints/20200417_1/yolov3_train_best.tf',
                     'path to weights file')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_integer('size', 416, 'resize images to')
-flags.DEFINE_string('image', 'data/2019-11-14_14-14-39.mp4_frame01136.jpg', 'path to input image')
+flags.DEFINE_string('image', 'data/2020-03-10_16-52-34_L_frame00090.jpg', 'path to input image')
 flags.DEFINE_string('output', './output.jpg', 'path to output image')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 

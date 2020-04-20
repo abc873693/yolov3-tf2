@@ -1,8 +1,8 @@
 
 #declare -a experitentDir=("20200326_1" "20200326_2" "20200326_3" "20200408_1" "20200408_2" "20200408_3" "20200409_2" "20200410_1" "20200410_2" "20200410_3" "20200410_4")
-declare -a experitentDirs=("20200302_2" "20200302_3")
+declare -a experitentDirs=( "20200417_4" "20200417_5")
 #declare -a dataset=("brown128" "green859" "thickBrown1227" "thinGreen1068")
-declare -a dataset=("microfield_monocular_test")
+declare -a dataset=("microfield_monocular_valid")
 
 weightName=best
 

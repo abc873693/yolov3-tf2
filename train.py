@@ -26,8 +26,8 @@ import yolov3_tf2.dataset as dataset
 
 import os
 
-flags.DEFINE_string('dataset', './data/microfield_monocular_v2/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/microfield_monocular_v2/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('dataset', './data/shrimp_v6/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/shrimp_v6/valid.tfrecord', 'path to validation dataset')
 flags.DEFINE_string('test_dataset_path', './data/microfield_monocular_test/', 'path to test dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_string('name', '20200304_1',
@@ -174,14 +174,14 @@ def main(_argv):
                     # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                     # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                     # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                    # images = tfa.image.random_hsv_in_yiq(
-                    #     images,
-                    #     max_delta_hue=0.1,
-                    #     lower_saturation=1/1.5,
-                    #     upper_saturation=1.5,
-                    #     lower_value=1/1.5,
-                    #     upper_value=1.5,
-                    # )
+                    images = tfa.image.random_hsv_in_yiq(
+                        images,
+                        max_delta_hue=0.1,
+                        lower_saturation=1/1.5,
+                        upper_saturation=1.5,
+                        lower_value=1/1.5,
+                        upper_value=1.5,
+                    )
                     # images = randomHSV(images, 1.5, 1.5, 0.3)
                     outputs = model(images, training=True)
                     regularization_loss = tf.reduce_sum(model.losses)
@@ -204,14 +204,14 @@ def main(_argv):
                 # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                 # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                 # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                # images = tfa.image.random_hsv_in_yiq(
-                #     images,
-                #     max_delta_hue=0.1,
-                #     lower_saturation=1/1.5,
-                #     upper_saturation=1.5,
-                #     lower_value=1/1.5,
-                #     upper_value=1.5,
-                # )
+                images = tfa.image.random_hsv_in_yiq(
+                    images,
+                    max_delta_hue=0.1,
+                    lower_saturation=1/1.5,
+                    upper_saturation=1.5,
+                    lower_value=1/1.5,
+                    upper_value=1.5,
+                )
                 # images = randomHSV(images, 1.5, 1.5, 0.3)
                 outputs = model(images)
                 regularization_loss = tf.reduce_sum(model.losses)
