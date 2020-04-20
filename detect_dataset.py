@@ -106,9 +106,10 @@ def main(_argv):
                     size_ture = labels[: , 5]
                 outputs = (boxes, sizes , scores, classes, nums)
                 grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
-                img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
+                if has_size_label:
+                    img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
                 cv2.imwrite(output_path , img)
-                TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth , FLAGS.iou_trethold)
+                TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold)
                 TP_total += TP
                 FP_total += FP
                 FN_total += FN

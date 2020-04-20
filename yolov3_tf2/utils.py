@@ -240,7 +240,8 @@ def read_yolo_labels(label_path):
             labels.append(label)
     return np.array(labels), has_size_label, len(labels)
 
-def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
+def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold):
+    logging.info(has_size_label)
     boxes, sizes, objectness, classes, nums = outputs
     boxes_ture, sizes_ture, classes_ture, nums_ture = grund_truths
     boxes, sizes, objectness, classes, nums = boxes[0].numpy(), sizes[0].numpy() , objectness[0].numpy(), classes[0].numpy(), nums[0]
@@ -260,12 +261,14 @@ def yolo_extend_evaluate(outputs , grund_truths, iou_trethold):
             TP += 1
             if(len(sizes_ture) == 0):
                 size_ralative_error = 1.0
-            else:
+            elif has_size_label:
                 predit = size_normalize_revert(sizes[i])
                 ground_trueth = size_normalize_revert(sizes_ture[index])
                 size_ralative_error = abs(predit - ground_trueth) / ground_trueth
-            # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
-            logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(predit ,ground_trueth, size_ralative_error))
+                # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
+                logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(predit ,ground_trueth, size_ralative_error))
+            else:
+                size_ralative_error = 1.0
             size_errors.append(size_ralative_error)
     are = 0
     if len(size_errors) != 0:
