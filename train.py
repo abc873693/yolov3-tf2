@@ -57,6 +57,8 @@ flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weight
 
 #python3 train.py --batch_size 8 --dataset ./microfield_4_train.tfrecord --val_dataset ~/Data/voc2012_val.tfrecord --epochs 10 --mode eager_fit --transfer fine_tune --weights ./checkpoints/yolov3-tiny.tf --tiny
 def main(_argv):
+    if not('CUDA_VISIBLE_DEVICES' in os.environ):
+        os.environ["CUDA_VISIBLE_DEVICES"] = "7"
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
