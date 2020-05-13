@@ -73,8 +73,8 @@ def DarknetBlock(x, filters, blocks):
     return x
 
 
-def Darknet(name=None):
-    x = inputs = Input([None, None, 3])
+def Darknet(name=None, channels=3):
+    x = inputs = Input([None, None, channels])
     x = DarknetConv(x, 32, 3)
     x = DarknetBlock(x, 64, 1)
     x = DarknetBlock(x, 128, 2)  # skip connection
@@ -84,8 +84,8 @@ def Darknet(name=None):
     return tf.keras.Model(inputs, (x_36, x_61, x), name=name)
 
 
-def DarknetTiny(name=None):
-    x = inputs = Input([None, None, 3])
+def DarknetTiny(name=None, channels=3):
+    x = inputs = Input([None, None, channels])
     x = DarknetConv(x, 16, 3)
     x = MaxPool2D(2, 2, 'same')(x)
     x = DarknetConv(x, 32, 3)
@@ -240,7 +240,7 @@ def YoloV3(size=None, channels=3, anchors=yolo_anchors,
            masks=yolo_anchor_masks, classes=80, training=False):
     x = inputs = Input([size, size, channels])
 
-    x_36, x_61, x = Darknet(name='yolo_darknet')(x)
+    x_36, x_61, x = Darknet(name='yolo_darknet', channels=channels)(x)
 
     x = YoloConv(512, name='yolo_conv_0')(x)
     output_0 = YoloOutput(512, len(masks[0]), classes, name='yolo_output_0')(x)
@@ -271,7 +271,7 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
                masks=yolo_tiny_anchor_masks, classes=80, training=False):
     x = inputs = Input([size, size, channels])
 
-    x_8, x = DarknetTiny(name='yolo_darknet')(x)
+    x_8, x = DarknetTiny(name='yolo_darknet', channels=channels)(x)
 
     x = YoloConvTiny(256, name='yolo_conv_0')(x)
     output_0 = YoloOutput(256, len(masks[0]), classes, name='yolo_output_0')(x)
@@ -290,7 +290,7 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
                      name='yolo_nms')((boxes_0[:4], boxes_1[:4]))
     return Model(inputs, outputs, name='yolov3_tiny')
 
-def calculateMap(yolo, input_path):
+def calculateMap(yolo, channels, input_path):
 
     image_count = 0
     label_count = 0
@@ -299,21 +299,28 @@ def calculateMap(yolo, input_path):
 
     TP_total, FP_total, FN_total = 0, 0, 0
 
+    if channels == 4:
+        file_type = '.png'
+    elif channels == 3:
+        file_type = '.jpg'
+    else :
+        raise 'can\'t use other channels'
+
     for file_name in os.listdir(input_path):
-        if file_name.find('.jpg') == -1:
+        if file_name.find(file_type) == -1:
             continue
         image_path = input_path + file_name
 
         image_count += 1
 
-        img = tf.image.decode_image(open(image_path, 'rb').read(), channels=3)
+        img = tf.image.decode_png(open(image_path, 'rb').read(), channels=4)
         img = tf.expand_dims(img, 0)
         img = transform_images(img, FLAGS.size)
 
         out1, out2 = yolo(img)
         boxes, sizes, scores, classes , nums = tinyEnd(out1, out2)
         
-        label_filename = file_name.replace('.jpg','.txt')
+        label_filename = file_name.replace(file_type,'.txt')
         label_path = input_path + label_filename
         if os.path.exists(label_path):
             label_count += 1
@@ -327,13 +334,13 @@ def calculateMap(yolo, input_path):
                 size_ture = labels[: , 5]
             outputs = (boxes, sizes , scores, classes, nums)
             grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
-            TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth , FLAGS.yolo_iou_threshold)
+            TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth, has_size_label, FLAGS.yolo_iou_threshold)
             TP_total += TP
             FP_total += FP
             FN_total += FN
             REs.extend(RE)
 
-    are = 100.0
+    are = 1.0
     if len(REs) != 0:
         are = sum(REs) / len(REs)
     if((TP_total + FP_total) != 0):

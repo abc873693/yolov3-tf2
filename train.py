@@ -26,13 +26,13 @@ import yolov3_tf2.dataset as dataset
 
 import os
 
-flags.DEFINE_string('dataset', './data/shrimp_v6/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/shrimp_v6/valid.tfrecord', 'path to validation dataset')
-flags.DEFINE_string('test_dataset_path', './data/microfield_monocular_test/', 'path to test dataset')
+flags.DEFINE_string('dataset', './data/shrimp_v8/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/shrimp_v8/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('test_dataset_path', './data/microfield_monocular_v2_depth_test/', 'path to test dataset')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('name', '20200304_1',
+flags.DEFINE_string('name', '20200512_3',
                     'path to weights name')
-flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
+flags.DEFINE_string('weights', './checkpoints/20200417_3/yolov3_train_best.tf',
                     'path to weights file')
 flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
 flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
@@ -47,8 +47,9 @@ flags.DEFINE_enum('transfer', 'none',
                   'frozen: Transfer and freeze all, '
                   'fine_tune: Transfer all and freeze darknet only')
 flags.DEFINE_integer('size', 416, 'image size')
+flags.DEFINE_integer('channels', 4, 'image channels size')
 flags.DEFINE_integer('epochs', 100, 'number of epochs')
-flags.DEFINE_integer('batch_size', 32, 'batch size')
+flags.DEFINE_integer('batch_size', 8, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weights` file if different, '
@@ -66,11 +67,11 @@ def main(_argv):
 
     if FLAGS.tiny:
         model = YoloV3Tiny(FLAGS.size, training=True,
-                           classes=FLAGS.num_classes)
+                           classes=FLAGS.num_classes, channels=FLAGS.channels)
         anchors = yolo_tiny_anchors
         anchor_masks = yolo_tiny_anchor_masks
     else:
-        model = YoloV3(FLAGS.size, training=True, classes=FLAGS.num_classes)
+        model = YoloV3(FLAGS.size, training=True, classes=FLAGS.num_classes, channels=FLAGS.channels)
         anchors = yolo_anchors
         anchor_masks = yolo_anchor_masks
 
@@ -107,10 +108,10 @@ def main(_argv):
         # reset top layers
         if FLAGS.tiny:
             model_pretrained = YoloV3Tiny(
-                FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+                FLAGS.size, training=True, channels=FLAGS.channels, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
         else:
             model_pretrained = YoloV3(
-                FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+                FLAGS.size, training=True, channels=FLAGS.channels, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
         model_pretrained.load_weights(FLAGS.weights)
 
         if FLAGS.transfer == 'darknet':
@@ -174,14 +175,14 @@ def main(_argv):
                     # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                     # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                     # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                    images = tfa.image.random_hsv_in_yiq(
-                        images,
-                        max_delta_hue=0.1,
-                        lower_saturation=1/1.5,
-                        upper_saturation=1.5,
-                        lower_value=1/1.5,
-                        upper_value=1.5,
-                    )
+                    # images = tfa.image.random_hsv_in_yiq(
+                    #     images,
+                    #     max_delta_hue=0.1,
+                    #     lower_saturation=1/1.5,
+                    #     upper_saturation=1.5,
+                    #     lower_value=1/1.5,
+                    #     upper_value=1.5,
+                    # )
                     # images = randomHSV(images, 1.5, 1.5, 0.3)
                     outputs = model(images, training=True)
                     regularization_loss = tf.reduce_sum(model.losses)
@@ -204,14 +205,14 @@ def main(_argv):
                 # images = tf.image.random_brightness(images, 0.1)  # 隨機亮度
                 # images = tf.image.random_saturation(images, 0.7, 1.3)  # 隨機飽和度
                 # images = tf.image.random_contrast(images, 0.6, 1.5)  # 隨機對比度
-                images = tfa.image.random_hsv_in_yiq(
-                    images,
-                    max_delta_hue=0.1,
-                    lower_saturation=1/1.5,
-                    upper_saturation=1.5,
-                    lower_value=1/1.5,
-                    upper_value=1.5,
-                )
+                # images = tfa.image.random_hsv_in_yiq(
+                #     images,
+                #     max_delta_hue=0.1,
+                #     lower_saturation=1/1.5,
+                #     upper_saturation=1.5,
+                #     lower_value=1/1.5,
+                #     upper_value=1.5,
+                # )
                 # images = randomHSV(images, 1.5, 1.5, 0.3)
                 outputs = model(images)
                 regularization_loss = tf.reduce_sum(model.losses)
@@ -231,7 +232,7 @@ def main(_argv):
             loss_records.append(train_loss)
             loss_val_records.append(val_loss)
 
-            precision, recall, ARE = calculateMap(model, FLAGS.test_dataset_path)
+            precision, recall, ARE = calculateMap(model, FLAGS.channels, FLAGS.test_dataset_path)
             
             precision_records.append(precision)
             recall_records.append(recall)
