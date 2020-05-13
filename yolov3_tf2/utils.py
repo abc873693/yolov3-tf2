@@ -241,7 +241,6 @@ def read_yolo_labels(label_path):
     return np.array(labels), has_size_label, len(labels)
 
 def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold):
-    logging.info(has_size_label)
     boxes, sizes, objectness, classes, nums = outputs
     boxes_ture, sizes_ture, classes_ture, nums_ture = grund_truths
     boxes, sizes, objectness, classes, nums = boxes[0].numpy(), sizes[0].numpy() , objectness[0].numpy(), classes[0].numpy(), nums[0]
@@ -274,7 +273,10 @@ def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold):
     if len(size_errors) != 0:
         are = sum(size_errors)/ len(size_errors)
     # logging.info('TP = {} FP = {}, size average ralative error = {}'.format(TP, FP, are))
-    return TP, FP, (nums_ture - TP), size_errors
+    FN = (nums_ture - TP)
+    if FN < 0:
+        FN =  -FN
+    return TP, FP, FN, size_errors
 
 def save_loss_plot(train_loss = [], val_loss = [], precision = [], recall = [],are = [] ,save_path = './loss.png'):
     fig, ax1 = plt.subplots()
