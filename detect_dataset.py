@@ -12,27 +12,29 @@ from yolov3_tf2.dataset import transform_images
 from yolov3_tf2.utils import (draw_outputs, draw_gt, read_yolo_labels, yolo_extend_evaluate)
 
 flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
-flags.DEFINE_string('weights_postfix', 'last', 'path to weights postfix')
+flags.DEFINE_string('weights_postfix', 'best', 'path to weights postfix')
 flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
 flags.DEFINE_boolean('map', True, 'calculate')
 flags.DEFINE_float('iou_trethold', 0.5, 'iou_trethold')
 flags.DEFINE_integer('size', 416, 'resize images to')
-flags.DEFINE_string('experiment', '20200326_2', 'path to dataset')
-flags.DEFINE_string('dataset', 'microfield_monocular_train', 'path to dataset')
+flags.DEFINE_integer('channels', 4, 'resize images to')
+flags.DEFINE_string('experiment', '20200505_1', 'path to dataset')
+flags.DEFINE_string('dataset', 'dataset/microfield_monocular_v2_depth/416X416/cfg/valid.txt', 'path to dataset')
+flags.DEFINE_boolean('save', True, 'save results')
 # flags.DEFINE_string('output_path', 'output/', 'path to output path')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
 
 def main(_argv):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
     if FLAGS.tiny:
-        yolo = YoloV3Tiny(classes=FLAGS.num_classes)
+        yolo = YoloV3Tiny(classes=FLAGS.num_classes,channels=FLAGS.channels)
     else:
-        yolo = YoloV3(classes=FLAGS.num_classes)
+        yolo = YoloV3(classes=FLAGS.num_classes,channels=FLAGS.channels)
 
     weights_path = 'checkpoints/{}/yolov3_train_{}.tf'.format(FLAGS.experiment, FLAGS.weights_postfix)
 
@@ -60,15 +62,37 @@ def main(_argv):
 
     TP_total, FP_total, FN_total = 0, 0, 0
 
-    for file_name in os.listdir(input_path):
+    if FLAGS.channels == 4:
+        file_type = '.png'
+    elif FLAGS.channels == 3:
+        file_type = '.jpg'
+    else :
+        raise 'can\'t use other channels'
+
+    for image_path in open(input_path, "r").read().splitlines():
+        file_name = image_path.split('/')[-1]
         logging.info(file_name)
-        if file_name.find('.jpg') == -1:
+        if file_name.find(file_type) == -1:
             continue
-        image_path = input_path + file_name
+        # image_path = input_path + file_name
 
         image_count += 1
 
-        img = tf.image.decode_image(open(image_path, 'rb').read(), channels=3)
+        if FLAGS.channels == 4:
+            img = tf.image.decode_png(open(image_path, 'rb').read(), channels=4)
+        elif  FLAGS.channels == 3:
+            # if FLAGS.channels == 3:
+            img = tf.image.decode_image(open(image_path, 'rb').read(), channels=3)
+        else: 
+            raise 'can\'t use other channels'
+            # else:    
+                # image = cv2.imread(image_path) 
+                # height, width, _ = image.shape
+                # rgbd = np.zeros((height,width,FLAGS.channels), dtype=int)
+                # rgbd[:,:,0:3] = image[:,:,:]
+                # success, encoded_image = cv2.imencode(file_type, image)
+                # content = encoded_image.tobytes()
+                # img = tf.image.decode_image(content, channels=FLAGS.channels)
         img = tf.expand_dims(img, 0)
         img = transform_images(img, FLAGS.size)
 
@@ -87,13 +111,13 @@ def main(_argv):
 
         img = cv2.imread(image_path)
         img = draw_outputs(img, (boxes, sizes , scores, classes, nums), class_names)
-        output_path = '{}/{}'.format(experiment_dataset_path , file_name)
-        cv2.imwrite(output_path , img)
-        logging.info('output saved to: {}'.format(output_path))
+        if FLAGS.save:
+            output_path = '{}/{}'.format(experiment_dataset_path , file_name)
+            cv2.imwrite(output_path , img)
+            logging.info('output saved to: {}'.format(output_path))
 
         if FLAGS.map:
-            label_filename = file_name.replace('.jpg','.txt')
-            label_path = input_path + label_filename
+            label_path = image_path.replace(file_type,'.txt')
             if os.path.exists(label_path):
                 label_count += 1
                 # labels np array [class_id, center_x, center_y, width, height, size]
@@ -106,16 +130,16 @@ def main(_argv):
                     size_ture = labels[: , 5]
                 outputs = (boxes, sizes , scores, classes, nums)
                 grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
-                if has_size_label:
+                if FLAGS.save and has_size_label:
                     img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
-                cv2.imwrite(output_path , img)
+                    cv2.imwrite(output_path , img)
                 TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold)
                 TP_total += TP
                 FP_total += FP
                 FN_total += FN
                 REs.extend(RE)
 
-    are = 0
+    are = 1.0
     if len(REs) != 0:
         are = sum(REs) / len(REs)
     if((TP_total + FP_total) != 0):
