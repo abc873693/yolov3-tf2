@@ -28,7 +28,8 @@ from yolov3_tf2.utils import size_normalize
 
 flags.DEFINE_string('text_input_path', 'train.txt',
                     'Path to the yolo label path list input')
-flags.DEFINE_string('output_path', 'train.tfrecord', 'Path to output TFRecord')
+flags.DEFINE_string('output_path', 'valid.tfrecord', 'Path to output TFRecord')
+flags.DEFINE_string('file_type', 'jpg', 'File Type for image')
 
 # TO-DO replace this with label map
 def class_text_to_int(row_label):
@@ -47,7 +48,7 @@ def split(df, group):
 def create_tf_example(imagePath):
     with tf.io.gfile.GFile(imagePath, 'rb') as fid:
         encoded_jpg = fid.read()
-    labelPath = imagePath.replace('.jpg', '.txt')
+    labelPath = imagePath.replace('.' + FLAGS.file_type, '.txt')
     labelText = open(labelPath, "r")
     bboxes = labelText.read().splitlines()
 
@@ -57,7 +58,6 @@ def create_tf_example(imagePath):
 
     filename = imagePath.rsplit('/', 1)[1]
     # print(filename)
-    image_format = b'jpg'
     xmins = []
     xmaxs = []
     ymins = []
@@ -75,8 +75,11 @@ def create_tf_example(imagePath):
             width = float(array[3])
             height = float(array[4])
             if len(array) >= 6:
-                size = size_normalize(float(array[5]))
-                print('before: {} after: {}'.format(array[5], size))
+                if float(array[5]) > 1.0:
+                    size = size_normalize(float(array[5]))
+                    print('before: {} after: {}'.format(array[5], size))
+                else:
+                    size = 0.0
             else:
                 size = 0.0
             xmins.append(center_x - width / 2.0)  # xmin
@@ -94,7 +97,7 @@ def create_tf_example(imagePath):
         'image/filename': _bytes_feature(filename.encode('utf8')),
         'image/source_id': _bytes_feature(filename.encode('utf8')),
         'image/encoded': _bytes_feature(encoded_jpg),
-        'image/format': _bytes_feature(image_format),
+        'image/format': _bytes_feature(FLAGS.file_type.encode('utf8')),
         'image/key/sha256': _bytes_feature(key.encode('utf8')),
         'image/object/bbox/xmin': _float_list_feature(xmins),
         'image/object/bbox/xmax': _float_list_feature(xmaxs),
@@ -149,7 +152,8 @@ def main(_argv):
     output_path = FLAGS.output_path
     writer = tf.io.TFRecordWriter(output_path)
     for filePath in text.read().splitlines():
-        labelPath = filePath.replace('.jpg', '.txt')
+        labelPath = filePath.replace('.' + FLAGS.file_type, '.txt')
+        print(labelPath)
         if os.path.isfile(filePath) and os.path.isfile(labelPath):
             tf_example = create_tf_example(filePath)
             writer.write(tf_example.SerializeToString())
