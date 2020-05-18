@@ -26,6 +26,7 @@ from absl.flags import FLAGS
 
 from yolov3_tf2.utils import size_normalize
 
+flags.DEFINE_integer('size', 416 , 'image size')
 flags.DEFINE_string('text_input_path', 'train.txt',
                     'Path to the yolo label path list input')
 flags.DEFINE_string('output_path', 'valid.tfrecord', 'Path to output TFRecord')
@@ -92,8 +93,8 @@ def create_tf_example(imagePath):
             print(size)
     key = hashlib.sha256(encoded_jpg).hexdigest()
     tf_example = tf.train.Example(features=tf.train.Features(feature={
-        'image/height': _int64_feature(416),
-        'image/width': _int64_feature(416),
+        'image/height': _int64_feature(FLAGS.size),
+        'image/width': _int64_feature(FLAGS.size),
         'image/filename': _bytes_feature(filename.encode('utf8')),
         'image/source_id': _bytes_feature(filename.encode('utf8')),
         'image/encoded': _bytes_feature(encoded_jpg),
