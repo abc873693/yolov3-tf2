@@ -11,10 +11,9 @@ from tensorflow.keras.callbacks import (
     TensorBoard
 )
 from yolov3_tf2.models import (
-    YoloV3, YoloV3Tiny, YoloLoss,
+    YoloV3, YoloV3Tiny, SingleOutput, YoloLoss, SingleSizeLoss,
     yolo_anchors, yolo_anchor_masks,
-    yolo_tiny_anchors, yolo_tiny_anchor_masks, calculateMap
-
+    yolo_tiny_anchors, yolo_tiny_anchor_masks, calculateMap,
 )
 from yolov3_tf2.utils import (
     freeze_all,
@@ -26,11 +25,12 @@ import yolov3_tf2.dataset as dataset
 
 import os
 
-flags.DEFINE_string('dataset', './data/shrimp_v8/train.tfrecord', 'path to dataset')
-flags.DEFINE_string('val_dataset', './data/shrimp_v8/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_string('dataset', './data/mm_v2_depth_crop/train.tfrecord', 'path to dataset')
+flags.DEFINE_string('val_dataset', './data/mm_v2_depth_crop/valid.tfrecord', 'path to validation dataset')
+flags.DEFINE_integer('dataset_image_size', 104, 'image size')
 flags.DEFINE_string('test_dataset_path', './data/microfield_monocular_v2_depth_test/', 'path to test dataset')
-flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('name', '20200512_3',
+flags.DEFINE_enum('model', 'single-output', ['yolov3', 'yolov3-tiny', 'single-output'] , 'yolov3 or yolov3-tiny')
+flags.DEFINE_string('name', '20200515_1',
                     'path to weights name')
 flags.DEFINE_string('weights', './checkpoints/20200417_3/yolov3_train_best.tf',
                     'path to weights file')
@@ -46,7 +46,7 @@ flags.DEFINE_enum('transfer', 'none',
                   'no_output: Transfer all but output, '
                   'frozen: Transfer and freeze all, '
                   'fine_tune: Transfer all and freeze darknet only')
-flags.DEFINE_integer('size', 416, 'image size')
+flags.DEFINE_integer('size', 104, 'image size')
 flags.DEFINE_integer('channels', 4, 'image channels size')
 flags.DEFINE_integer('epochs', 100, 'number of epochs')
 flags.DEFINE_integer('batch_size', 8, 'batch size')
@@ -67,41 +67,53 @@ def main(_argv):
     if not os.path.exists(weight_base_dir):
         os.makedirs(weight_base_dir)
 
-    if FLAGS.tiny:
-        model = YoloV3Tiny(FLAGS.size, training=True,
+    if FLAGS.model == 'yolov3':
+        model = YoloV3(FLAGS.size, training=True,
                            classes=FLAGS.num_classes, channels=FLAGS.channels)
         anchors = yolo_tiny_anchors
         anchor_masks = yolo_tiny_anchor_masks
-    else:
-        model = YoloV3(FLAGS.size, training=True, classes=FLAGS.num_classes, channels=FLAGS.channels)
+    elif FLAGS.model == 'yolov3-tiny':
+        model = YoloV3Tiny(FLAGS.size, training=True, classes=FLAGS.num_classes, channels=FLAGS.channels)
         anchors = yolo_anchors
         anchor_masks = yolo_anchor_masks
+    else:
+        model = SingleOutput(FLAGS.size, training=True, channels=FLAGS.channels)
 
     # train_dataset = dataset.load_fake_dataset()
     # train_dataset = dataset.load_text_dataset('dataset/microfield_4/416X416/cfg/train.txt')
     if FLAGS.dataset:
         train_dataset = dataset.load_tfrecord_dataset(
-            FLAGS.dataset, FLAGS.classes, FLAGS.channels)
+            FLAGS.dataset, FLAGS.classes, FLAGS.dataset_image_size, FLAGS.channels)
     train_dataset = train_dataset.shuffle(buffer_size=1024)  # TODO: not 1024
     train_dataset = train_dataset.batch(FLAGS.batch_size)
-    train_dataset = train_dataset.map(lambda x, y: (
-        dataset.transform_images(x, FLAGS.size),
-        dataset.transform_targets(y, anchors, anchor_masks, 1)))
+    if FLAGS.model == 'single-output':
+        train_dataset = train_dataset.map(lambda x, y: (
+            dataset.transform_images(x, FLAGS.size),
+            dataset.transform_singgle_size_targets(y)))
+    else:
+        train_dataset = train_dataset.map(lambda x, y: (
+            dataset.transform_images(x, FLAGS.size),
+            dataset.transform_targets(y, anchors, anchor_masks, FLAGS.classes)))
     train_dataset = train_dataset.prefetch(
         buffer_size=tf.data.experimental.AUTOTUNE)
-
+    
     # val_dataset = dataset.load_fake_dataset()
     # val_dataset = dataset.load_text_dataset('dataset/microfield_4/416X416/cfg/valid.txt')
     if FLAGS.val_dataset:
         val_dataset = dataset.load_tfrecord_dataset(
-            FLAGS.val_dataset, FLAGS.classes, FLAGS.channels)
+            FLAGS.val_dataset, FLAGS.classes, FLAGS.dataset_image_size, FLAGS.channels)
     val_dataset = val_dataset.batch(FLAGS.batch_size)
-    val_dataset = val_dataset.map(lambda x, y: (
-        dataset.transform_images(x, FLAGS.size),
-        dataset.transform_targets(y, anchors, anchor_masks, 1)))
+    if FLAGS.model == 'single-output':
+        val_dataset = val_dataset.map(lambda x, y: (
+            dataset.transform_images(x, FLAGS.size),
+            dataset.transform_singgle_size_targets(y)))
+    else:
+        val_dataset = val_dataset.map(lambda x, y: (
+            dataset.transform_images(x, FLAGS.size),
+            dataset.transform_targets(y, anchors, anchor_masks, FLAGS.classes)))
 
         # Configure the model for transfer learning
-    if FLAGS.transfer == 'none':
+    if FLAGS.model == 'single-output' or FLAGS.transfer == 'none':
         pass  # Nothing to do
     elif FLAGS.transfer in ['darknet', 'no_output']:
         # Darknet transfer is a special case that works
@@ -149,9 +161,12 @@ def main(_argv):
 
     # optimizer = tfa.optimizers.SGDW(
     #     learning_rate=lr, weight_decay=wd)
-        
-    loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
-            for mask in anchor_masks]
+
+    if FLAGS.model == 'single-output':
+        loss = SingleSizeLoss()
+    else:    
+        loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
+                for mask in anchor_masks]
 
     if FLAGS.mode == 'eager_tf':
         # Eager mode is great for debugging
@@ -189,8 +204,11 @@ def main(_argv):
                     outputs = model(images, training=True)
                     regularization_loss = tf.reduce_sum(model.losses)
                     pred_loss = []
-                    for output, label, loss_fn in zip(outputs, labels, loss):
-                        pred_loss.append(loss_fn(label, output))
+                    if FLAGS.model == 'single-output':
+                        pred_loss.append(loss(labels, outputs))
+                    else:
+                        for output, label, loss_fn in zip(outputs, labels, loss):
+                            pred_loss.append(loss_fn(label, output))
                     total_loss = tf.reduce_sum(pred_loss) + regularization_loss
 
                 grads = tape.gradient(total_loss, model.trainable_variables)
@@ -219,8 +237,11 @@ def main(_argv):
                 outputs = model(images)
                 regularization_loss = tf.reduce_sum(model.losses)
                 pred_loss = []
-                for output, label, loss_fn in zip(outputs, labels, loss):
-                    pred_loss.append(loss_fn(label, output))
+                if FLAGS.model == 'single-output':
+                    pred_loss.append(loss(labels, outputs))
+                else:
+                    for output, label, loss_fn in zip(outputs, labels, loss):
+                        pred_loss.append(loss_fn(label, output))
                 total_loss = tf.reduce_sum(pred_loss) + regularization_loss
 
                 logging.info("{}_val_{}, {}, {}".format(
@@ -234,10 +255,13 @@ def main(_argv):
             loss_records.append(train_loss)
             loss_val_records.append(val_loss)
 
-            precision, recall, ARE = calculateMap(model, FLAGS.channels, FLAGS.test_dataset_path)
-            
-            precision_records.append(precision)
-            recall_records.append(recall)
+            if FLAGS.model == 'single-output':
+                precision, recall, ARE = calculateMap(model, FLAGS.model, FLAGS.channels, FLAGS.test_dataset_path)
+            else:
+                precision, recall, ARE = calculateMap(model, FLAGS.model, FLAGS.channels, FLAGS.test_dataset_path)
+                
+                precision_records.append(precision)
+                recall_records.append(recall)
             relative_error_records.append(ARE)
 
             logging.info("{}, train: {}, val: {}, precision: {}, recall: {}, relative error: {}".format(

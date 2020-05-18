@@ -23,7 +23,8 @@ from .batch_norm import BatchNormalization
 from .utils import (
     broadcast_iou,
     read_yolo_labels,
-    yolo_extend_evaluate
+    yolo_extend_evaluate,
+    single_value_evaluate
 )
 from .dataset import transform_images
 
@@ -290,7 +291,30 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
                      name='yolo_nms')((boxes_0[:4], boxes_1[:4]))
     return Model(inputs, outputs, name='yolov3_tiny')
 
-def calculateMap(yolo, channels, input_path):
+def SingleOutput(size=None, channels=3, training=False):
+    x = inputs = Input([size, size, channels])
+
+    x = DarknetConv(x, 16, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 64, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 128, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 64, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 16, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 4, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 1, 1)
+    x = MaxPool2D(2, 2, 'same')(x)
+    outputs = x
+
+    if hasattr(x, 'numpy'):
+        outputs = x.numpy()
+    return Model(inputs, outputs, name='single_output')
+
+def calculateMap(yolo, model, channels, input_path):
 
     image_count = 0
     label_count = 0
@@ -317,8 +341,11 @@ def calculateMap(yolo, channels, input_path):
         img = tf.expand_dims(img, 0)
         img = transform_images(img, FLAGS.size)
 
-        out1, out2 = yolo(img)
-        boxes, sizes, scores, classes , nums = tinyEnd(out1, out2)
+        if model == 'single-output':
+            sizes = yolo(img)
+        else:
+            out1, out2 = yolo(img)
+            boxes, sizes, scores, classes , nums = tinyEnd(out1, out2)
         
         label_filename = file_name.replace(file_type,'.txt')
         label_path = input_path + label_filename
@@ -332,13 +359,17 @@ def calculateMap(yolo, channels, input_path):
 
             if has_size_label:
                 size_ture = labels[: , 5]
-            outputs = (boxes, sizes , scores, classes, nums)
-            grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
-            TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth, has_size_label, FLAGS.yolo_iou_threshold)
-            TP_total += TP
-            FP_total += FP
-            FN_total += FN
-            REs.extend(RE)
+            if model == 'single-output':
+                RE = single_value_evaluate(sizes, labels[0 , 5])
+                REs.append(RE)
+            else:
+                outputs = (boxes, sizes , scores, classes, nums)
+                grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
+                TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth, has_size_label, FLAGS.yolo_iou_threshold)
+                TP_total += TP
+                FP_total += FP
+                FN_total += FN
+                REs.extend(RE)
 
     are = 1.0
     if len(REs) != 0:
@@ -431,3 +462,19 @@ def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
 
         return xy_loss + wh_loss + size_loss + obj_loss + class_loss
     return yolo_loss
+
+def SingleSizeLoss():
+    def size_loss(y_true, y_pred):
+        # x = y_true[:,0]
+        # y = x.reshape([8, 1, 1, 1])
+        #TODO simplfy
+        size_loss = tf.reduce_sum(tf.square(minus_if_zero(y_pred , y_true)), axis=-1) 
+        # a = y_pred.numpy()
+        # b = y_true.numpy()
+        # c = size_loss.numpy()
+        # print(a)
+        # print(b)
+        # print(c)
+        # size_loss = tf.reduce_sum(size_loss, axis=(1, 2, 3))
+        return size_loss
+    return size_loss

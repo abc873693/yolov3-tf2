@@ -6,35 +6,38 @@ import cv2
 import numpy as np
 import tensorflow as tf
 from yolov3_tf2.models import (
-    YoloV3, YoloV3Tiny
+    YoloV3, YoloV3Tiny, SingleOutput
 )
 from yolov3_tf2.dataset import transform_images
-from yolov3_tf2.utils import (draw_outputs, draw_gt, read_yolo_labels, yolo_extend_evaluate)
+from yolov3_tf2.utils import (draw_outputs, draw_gt, read_yolo_labels, single_value_evaluate, yolo_extend_evaluate)
 
 flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
 flags.DEFINE_string('weights_postfix', 'best', 'path to weights postfix')
-flags.DEFINE_boolean('tiny', True, 'yolov3 or yolov3-tiny')
+flags.DEFINE_enum('model', 'yolov3-tiny', ['yolov3', 'yolov3-tiny', 'single-output'] , 'yolov3 or yolov3-tiny')
 flags.DEFINE_boolean('map', True, 'calculate')
 flags.DEFINE_float('iou_trethold', 0.5, 'iou_trethold')
 flags.DEFINE_integer('size', 416, 'resize images to')
 flags.DEFINE_integer('channels', 4, 'resize images to')
-flags.DEFINE_string('experiment', '20200505_1', 'path to dataset')
-flags.DEFINE_string('dataset', 'dataset/microfield_monocular_v2_depth/416X416/cfg/valid.txt', 'path to dataset')
+flags.DEFINE_string('experiment', '20200513_1', 'path to dataset')
+flags.DEFINE_string('dataset', 'dataset/shrimp_v7/cfg/valid.txt', 'path to dataset')
 flags.DEFINE_boolean('save', True, 'save results')
 # flags.DEFINE_string('output_path', 'output/', 'path to output path')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
 
 def main(_argv):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "6"
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-    if FLAGS.tiny:
-        yolo = YoloV3Tiny(classes=FLAGS.num_classes,channels=FLAGS.channels)
+    if FLAGS.model == 'yolov3':
+        yolo = YoloV3(FLAGS.size, training=False,
+                           classes=FLAGS.num_classes, channels=FLAGS.channels)
+    elif FLAGS.model == 'yolov3-tiny':
+        yolo = YoloV3Tiny(FLAGS.size, training=False, classes=FLAGS.num_classes, channels=FLAGS.channels)
     else:
-        yolo = YoloV3(classes=FLAGS.num_classes,channels=FLAGS.channels)
+        yolo = SingleOutput(FLAGS.size, training=False, channels=FLAGS.channels)
 
     weights_path = 'checkpoints/{}/yolov3_train_{}.tf'.format(FLAGS.experiment, FLAGS.weights_postfix)
 
@@ -53,7 +56,7 @@ def main(_argv):
     if not os.path.exists(experiment_dataset_path):
         os.makedirs(experiment_dataset_path)
 
-    input_path = 'data/{}/'.format(FLAGS.dataset)
+    input_path = '{}'.format(FLAGS.dataset)
 
     image_count = 0
     label_count = 0
@@ -97,7 +100,10 @@ def main(_argv):
         img = transform_images(img, FLAGS.size)
 
         t1 = time.time()
-        boxes, sizes, scores, classes , nums = yolo(img)
+        if FLAGS.model == 'single-output':
+            sizes = yolo(img)
+        else:
+            boxes, sizes, scores, classes , nums = yolo(img)
         t2 = time.time()
         logging.info('time: {}'.format(t2 - t1))
 
@@ -108,36 +114,43 @@ def main(_argv):
         #                                     np.array(boxes[0][i]),
         #                                     sizes[0][i]))       
                                             
-
-        img = cv2.imread(image_path)
-        img = draw_outputs(img, (boxes, sizes , scores, classes, nums), class_names)
-        if FLAGS.save:
-            output_path = '{}/{}'.format(experiment_dataset_path , file_name)
-            cv2.imwrite(output_path , img)
-            logging.info('output saved to: {}'.format(output_path))
-
-        if FLAGS.map:
+        if FLAGS.model == 'single-output':
             label_path = image_path.replace(file_type,'.txt')
-            if os.path.exists(label_path):
-                label_count += 1
-                # labels np array [class_id, center_x, center_y, width, height, size]
+            if FLAGS.map and os.path.exists(label_path):
                 labels, has_size_label, labels_nums = read_yolo_labels(label_path)
-                classes_true = labels[ : , 0]
-                boxes_ture = labels[ : , 1:5]
-                size_ture = np.array([])
+                RE = single_value_evaluate(sizes, labels[0 , 5])
+                REs.append(RE)
+        else:
+            img = cv2.imread(image_path)
+            img = draw_outputs(img, (boxes, sizes , scores, classes, nums), class_names)
+            if FLAGS.save:
+                output_path = '{}/{}'.format(experiment_dataset_path , file_name)
+                cv2.imwrite(output_path , img)
+                logging.info('output saved to: {}'.format(output_path))
+                pass
 
-                if has_size_label:
-                    size_ture = labels[: , 5]
-                outputs = (boxes, sizes , scores, classes, nums)
-                grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
-                if FLAGS.save and has_size_label:
-                    img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
-                    cv2.imwrite(output_path , img)
-                TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold)
-                TP_total += TP
-                FP_total += FP
-                FN_total += FN
-                REs.extend(RE)
+            if FLAGS.map:
+                label_path = image_path.replace(file_type,'.txt')
+                if os.path.exists(label_path):
+                    label_count += 1
+                    # labels np array [class_id, center_x, center_y, width, height, size]
+                    labels, has_size_label, labels_nums = read_yolo_labels(label_path)
+                    classes_true = labels[ : , 0]
+                    boxes_ture = labels[ : , 1:5]
+                    size_ture = np.array([])
+
+                    if has_size_label:
+                        size_ture = labels[: , 5]
+                    outputs = (boxes, sizes , scores, classes, nums)
+                    grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
+                    if FLAGS.save and has_size_label:
+                        img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
+                        cv2.imwrite(output_path , img)
+                    TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold)
+                    TP_total += TP
+                    FP_total += FP
+                    FN_total += FN
+                    REs.extend(RE)
 
     are = 1.0
     if len(REs) != 0:

@@ -69,6 +69,43 @@ def transform_targets(y_train, anchors, anchor_masks, classes):
 
     return tuple(y_outs)
 
+def transform_singgle_size_targets(y_train):
+    y_outs = []
+    grid_size = 13
+
+    print('test')
+    
+    N = tf.shape(y_train[2])
+    if hasattr(N, 'numpy'):
+        N = N.numpy()
+    print(N)
+
+    # calculate anchor index for true boxes
+    # anchors = tf.cast(anchors, tf.float32)
+    # anchor_area = anchors[..., 0] * anchors[..., 1]
+    # box_wh = y_train[..., 2:4] - y_train[..., 0:2]
+    # box_wh = tf.tile(tf.expand_dims(box_wh, -2),
+    #                  (1, 1, tf.shape(anchors)[0], 1))
+    # box_area = box_wh[..., 0] * box_wh[..., 1]
+    # intersection = tf.minimum(box_wh[..., 0], anchors[..., 0]) * \
+    #     tf.minimum(box_wh[..., 1], anchors[..., 1])
+    # iou = intersection / (box_area + anchor_area - intersection)
+    # anchor_idx = tf.cast(tf.argmax(iou, axis=-1), tf.float32)
+    # anchor_idx = tf.expand_dims(anchor_idx, axis=-1)
+
+    # y_train = tf.concat([y_train, anchor_idx], axis=-1)
+
+    # for anchor_idxs in anchor_masks:
+    #     y_outs.append(transform_targets_for_output(
+    #         y_train, grid_size, anchor_idxs, classes))
+    #     grid_size *= 2
+    global a
+    a = y_train[:,:, 5]
+    if hasattr(a, 'numpy'):
+        a = a.numpy()
+    print(a)
+    return y_train[..., 4]
+
 
 def transform_images(x_train, size):
     x_train = tf.image.resize(x_train, (size, size))
@@ -98,10 +135,10 @@ IMAGE_FEATURE_MAP = {
 }
 
 
-def parse_tfrecord(tfrecord, class_table, channels):
+def parse_tfrecord(tfrecord, class_table, size, channels):
     x = tf.io.parse_single_example(tfrecord, IMAGE_FEATURE_MAP)
     x_train = tf.image.decode_jpeg(x['image/encoded'], channels=channels)
-    x_train = tf.image.resize(x_train, (416, 416))
+    x_train = tf.image.resize(x_train, (size, size))
 
     class_text = tf.sparse.to_dense(
         x['image/object/class/text'], default_value='')
@@ -120,14 +157,14 @@ def parse_tfrecord(tfrecord, class_table, channels):
     return x_train, y_train
 
 
-def load_tfrecord_dataset(file_pattern, class_file, channels):
+def load_tfrecord_dataset(file_pattern, class_file, dataset_image_size, channels):
     LINE_NUMBER = -1  # TODO: use tf.lookup.TextFileIndex.LINE_NUMBER
     class_table = tf.lookup.StaticHashTable(tf.lookup.TextFileInitializer(
         class_file, tf.string, 0, tf.int64, LINE_NUMBER, delimiter="\n"), -1)
 
     files = tf.data.Dataset.list_files(file_pattern)
     dataset = files.flat_map(tf.data.TFRecordDataset)
-    return dataset.map(lambda x: parse_tfrecord(x, class_table, channels))
+    return dataset.map(lambda x: parse_tfrecord(x, class_table, dataset_image_size, channels))
 
 
 def load_fake_dataset():

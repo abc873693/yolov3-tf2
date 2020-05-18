@@ -240,6 +240,13 @@ def read_yolo_labels(label_path):
             labels.append(label)
     return np.array(labels), has_size_label, len(labels)
 
+def single_value_evaluate(outputs, size_true):
+    size = outputs.numpy()
+    size = size_normalize_revert(size[0,0,0,0])
+    size_true = size_normalize_revert(size_true)
+    RE = abs((size_true - size) / size_true)
+    return RE
+
 def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold):
     boxes, sizes, objectness, classes, nums = outputs
     boxes_ture, sizes_ture, classes_ture, nums_ture = grund_truths
