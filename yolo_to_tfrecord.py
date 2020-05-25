@@ -147,6 +147,15 @@ def _int64_feature(value):
     """Returns an int64_list from a bool / enum / int / uint."""
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
+datasets = ['clear999', 'clear1000', 'clear1005', 'clear1000_2', 'clear1001', 'noShrimp100', 'noShrimp200_1', 'noShrimp200_2', 'noShrimp200_3',
+            'noShrimp200_4', 'noShrimp200_5', 'noShrimp200_6', 'noShrimp200_7', 'noShrimp200_8', 'noShrimp200_9',
+             'microfield_1', 'microfield_2', 'microfield_3', 'microfield_4', 'microfield_5_v2', '2020-03-1']
+
+def filter_dataset(file_path):
+    for dataset in datasets:
+        if dataset in file_path:
+            return True
+    return False
 
 def main(_argv):
     text = open(FLAGS.text_input_path, "r")
@@ -154,8 +163,8 @@ def main(_argv):
     writer = tf.io.TFRecordWriter(output_path)
     for filePath in text.read().splitlines():
         labelPath = filePath.replace('.' + FLAGS.file_type, '.txt')
-        print(labelPath)
-        if os.path.isfile(filePath) and os.path.isfile(labelPath):
+        print('{} {}'.format(labelPath, filter_dataset(filePath)))
+        if os.path.isfile(filePath) and os.path.isfile(labelPath) and filter_dataset(filePath):
             tf_example = create_tf_example(filePath)
             writer.write(tf_example.SerializeToString())
             output_path = os.path.join(os.getcwd(), output_path)
