@@ -135,22 +135,23 @@ def main(_argv):
                     label_count += 1
                     # labels np array [class_id, center_x, center_y, width, height, size]
                     labels, has_size_label, labels_nums = read_yolo_labels(label_path)
-                    classes_true = labels[ : , 0]
-                    boxes_ture = labels[ : , 1:5]
-                    size_ture = np.array([])
+                    if labels.size != 0:
+                        classes_true = labels[ : , 0]
+                        boxes_ture = labels[ : , 1:5]
+                        size_ture = np.array([])
 
-                    if has_size_label:
-                        size_ture = labels[: , 5]
-                    outputs = (boxes, sizes , scores, classes, nums)
-                    grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
-                    if FLAGS.save and has_size_label:
-                        img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
-                        cv2.imwrite(output_path , img)
-                    TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold)
-                    TP_total += TP
-                    FP_total += FP
-                    FN_total += FN
-                    REs.extend(RE)
+                        if has_size_label:
+                            size_ture = labels[: , 5]
+                        outputs = (boxes, sizes , scores, classes, nums)
+                        grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
+                        if FLAGS.save and has_size_label:
+                            img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
+                            cv2.imwrite(output_path , img)
+                        TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold)
+                        TP_total += TP
+                        FP_total += FP
+                        FN_total += FN
+                        REs.extend(RE)
 
     are = 1.0
     if len(REs) != 0:

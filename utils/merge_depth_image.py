@@ -4,9 +4,9 @@ import shutil
 import numpy as np
 from cv2 import cv2 as cv
 
-source_path = '/home/MIT_lab/yolov3-tf2/dataset/shrimp_v5/test/'
+source_path = '/home/MIT_lab/bts/workspace/bts/tensorflow/shrimp_v7_test/rgb/'
 depth_path = '/home/MIT_lab/bts/workspace/bts/tensorflow/shrimp_v7_test/cmap/'
-out_path = '/home/MIT_lab/yolov3-tf2/dataset/shrimp_v8/test/'
+out_path = '/home/MIT_lab/yolov3-tf2/dataset/shrimp_v9/test/'
 
 if not os.path.exists(out_path):
     os.makedirs(out_path)
