@@ -292,15 +292,19 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
     return Model(inputs, outputs, name='yolov3_tiny')
 
 def SingleOutput(size=None, channels=3, training=False):
-    x = inputs = Input([size, size, channels])
+    x = inputs = Input([None, None, channels])
 
     x = DarknetConv(x, 16, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 32, 3)
     x = MaxPool2D(2, 2, 'same')(x)
     x = DarknetConv(x, 64, 3)
     x = MaxPool2D(2, 2, 'same')(x)
     x = DarknetConv(x, 128, 3)
     x = MaxPool2D(2, 2, 'same')(x)
     x = DarknetConv(x, 64, 3)
+    x = MaxPool2D(2, 2, 'same')(x)
+    x = DarknetConv(x, 32, 3)
     x = MaxPool2D(2, 2, 'same')(x)
     x = DarknetConv(x, 16, 3)
     x = MaxPool2D(2, 2, 'same')(x)
