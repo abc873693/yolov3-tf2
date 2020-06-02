@@ -247,7 +247,25 @@ def single_value_evaluate(outputs, size_true):
     RE = abs((size_true - size) / size_true)
     return RE
 
-def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold):
+def calculate_size_by_distance(depth_map, sizes_ture, bbox):
+    width = 1346
+    hieght = 1100
+    fx = 1889.282324
+    fy = 2520.282324
+    resImg = cv2.resize(depth_map, (hieght, width), interpolation=cv2.INTER_CUBIC)
+    cx = int(((bbox[2] + bbox[0]) / 2.0) * width)
+    cy = int(((bbox[3] + bbox[1]) / 2.0) * hieght)
+    b_w = (bbox[2] - bbox[0]) * width
+    b_h = (bbox[3] - bbox[1]) * hieght
+    depth = resImg[cx, cy, 0]
+    r_depth = (255 - depth) / 255 * 50.0
+    r_w = r_depth * b_w / fx
+    r_h = r_depth * b_h / fy
+    s = (r_w + r_h) / 2.0
+    # s = math.sqrt(r_w * r_w + r_h * r_h)
+    return s
+
+def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold, cmap_path):
     boxes, sizes, objectness, classes, nums = outputs
     boxes_ture, sizes_ture, classes_ture, nums_ture = grund_truths
     boxes, sizes, objectness, classes, nums = boxes[0].numpy(), sizes[0].numpy() , objectness[0].numpy(), classes[0].numpy(), nums[0]
@@ -270,6 +288,8 @@ def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold):
             elif has_size_label:
                 predit = size_normalize_revert(sizes[i])
                 ground_trueth = size_normalize_revert(sizes_ture[index])
+                cmap = cv2.imread(cmap_path)
+                predit = calculate_size_by_distance(cmap, sizes_ture[index], boxes[i])
                 size_ralative_error = abs(predit - ground_trueth) / ground_trueth
                 # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
                 logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(predit ,ground_trueth, size_ralative_error))

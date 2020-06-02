@@ -147,7 +147,10 @@ def main(_argv):
                         if FLAGS.save and has_size_label:
                             img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
                             cv2.imwrite(output_path , img)
-                        TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold)
+                        cmap_path = image_path.replace(file_type,'.png')
+                        cmap_path = cmap_path.replace('test', 'cmap')
+                        cmap_path = cmap_path.replace('valid', 'cmap')
+                        TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold, cmap_path = cmap_path)
                         TP_total += TP
                         FP_total += FP
                         FN_total += FN
