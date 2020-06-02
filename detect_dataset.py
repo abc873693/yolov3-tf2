@@ -14,6 +14,7 @@ from yolov3_tf2.utils import (draw_outputs, draw_gt, read_yolo_labels, single_va
 flags.DEFINE_string('classes', './data/shrimp.names', 'path to classes file')
 flags.DEFINE_string('weights_postfix', 'best', 'path to weights postfix')
 flags.DEFINE_enum('model', 'yolov3-tiny', ['yolov3', 'yolov3-tiny', 'single-output'] , 'yolov3 or yolov3-tiny')
+flags.DEFINE_enum('size_calculate_type', 'camera-focus', ['yolo-extend', 'camera-focus', 'linear'] , 'yolov3 or yolov3-tiny')
 flags.DEFINE_boolean('map', True, 'calculate')
 flags.DEFINE_float('iou_trethold', 0.5, 'iou_trethold')
 flags.DEFINE_integer('size', 416, 'resize images to')
@@ -152,7 +153,7 @@ def main(_argv):
                         cmap_path = image_path.replace(file_type,'.png')
                         cmap_path = cmap_path.replace('test', 'cmap')
                         cmap_path = cmap_path.replace('valid', 'cmap')
-                        TP, FP, FN, RE, DRE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold, cmap_path = cmap_path)
+                        TP, FP, FN, RE, DRE = yolo_extend_evaluate(FLAGS.size_calculate_type ,outputs , grund_truth ,has_size_label , FLAGS.iou_trethold, cmap_path = cmap_path)
                         TP_total += TP
                         FP_total += FP
                         FN_total += FN

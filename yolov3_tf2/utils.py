@@ -250,7 +250,9 @@ def single_value_evaluate(outputs, size_true):
     RE = abs((size_true - size) / size_true)
     return RE
 
-def calculate_size_by_distance(depth_map, bbox):
+def calculate_size_by_depth_map(depth_map, bbox):
+    if depth_map is None:
+        return 4.0, 4.0, 15.0
     width = 1346
     hieght = 1100
     max_depth = 50.0
@@ -265,11 +267,9 @@ def calculate_size_by_distance(depth_map, bbox):
     r_depth = (255 - depth) / 255 * max_depth
     r_w = r_depth * b_w / fx
     r_h = r_depth * b_h / fy
-    r_s = (r_w + r_h) / 2.0
-    # s = math.sqrt(r_w * r_w + r_h * r_h)
-    return r_s, r_depth
+    return r_w, r_h, r_depth
 
-def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold, cmap_path):
+def yolo_extend_evaluate(size_calculate_type, outputs, grund_truths, has_size_label, iou_trethold, cmap_path):
     boxes, sizes, objectness, classes, nums = outputs
     boxes_ture, sizes_ture, distances_ture, classes_ture, nums_ture = grund_truths
     boxes, sizes, objectness, classes, nums = boxes[0].numpy(), sizes[0].numpy() , objectness[0].numpy(), classes[0].numpy(), nums[0]
@@ -291,14 +291,18 @@ def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold, cm
             if(len(sizes_ture) == 0):
                 size_ralative_error = 1.0
             elif has_size_label:
-                predit = size_normalize_revert(sizes[i])
                 ground_trueth = size_normalize_revert(sizes_ture[index])
                 cmap = cv2.imread(cmap_path)
-                predit_size, predict_distance = calculate_size_by_distance(cmap, boxes[i])
+                r_w, r_h, predict_distance = calculate_size_by_depth_map(cmap, boxes[i])
+                if size_calculate_type == 'yolo-extend':
+                    predit_size = size_normalize_revert(sizes[i])
+                elif size_calculate_type == 'camera-focus':
+                    predit_size = (r_w + r_h) / 2.0
+                    # predit_size = math.sqrt(r_w * r_w + r_h * r_h)
                 size_ralative_error = abs(predit_size - ground_trueth) / ground_trueth
                 distance_ralative_error = abs(predict_distance - distances_ture[index]) / distances_ture[index]
                 # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
-                logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(predit ,ground_trueth, size_ralative_error))
+                logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(predit_size ,ground_trueth, size_ralative_error))
                 logging.info('distance_pre = {} distance_ture = {} distance_ralative_error = {}'.format(predict_distance ,distances_ture[index], distance_ralative_error))
             else:
                 size_ralative_error = 1.0
