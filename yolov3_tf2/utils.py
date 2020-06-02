@@ -5,6 +5,7 @@ import cv2
 import random as random
 import matplotlib.pyplot as plt
 import yolov3_tf2.dataset as dataset
+import math
 
 YOLOV3_LAYER_LIST = [
     'yolo_darknet',
@@ -226,17 +227,19 @@ def read_yolo_labels(label_path):
             height = float(array[4])
             if len(array) >= 6:
                 size = float(array[5])
+                distance = float(array[6])
                 if size > 1.0:
                     size = size_normalize(size)
             else:
                 has_size_label = False
                 size = float(0.5)
+                distance = float(15)
             x1 = center_x - width / 2.0  # xmin
             x2 = center_x + width / 2.0  # xmax
             y1 = center_y - height / 2.0  # ymin
             y2 = center_y + height / 2.0  # ymax
             # [y1, x1, y2, x2]
-            label = [class_id, x1, y1, x2, y2, size]
+            label = [class_id, x1, y1, x2, y2, size, distance]
             labels.append(label)
     return np.array(labels), has_size_label, len(labels)
 
@@ -247,9 +250,10 @@ def single_value_evaluate(outputs, size_true):
     RE = abs((size_true - size) / size_true)
     return RE
 
-def calculate_size_by_distance(depth_map, sizes_ture, bbox):
+def calculate_size_by_distance(depth_map, bbox):
     width = 1346
     hieght = 1100
+    max_depth = 50.0
     fx = 1889.282324
     fy = 2520.282324
     resImg = cv2.resize(depth_map, (hieght, width), interpolation=cv2.INTER_CUBIC)
@@ -258,19 +262,20 @@ def calculate_size_by_distance(depth_map, sizes_ture, bbox):
     b_w = (bbox[2] - bbox[0]) * width
     b_h = (bbox[3] - bbox[1]) * hieght
     depth = resImg[cx, cy, 0]
-    r_depth = (255 - depth) / 255 * 50.0
+    r_depth = (255 - depth) / 255 * max_depth
     r_w = r_depth * b_w / fx
     r_h = r_depth * b_h / fy
-    s = (r_w + r_h) / 2.0
+    r_s = (r_w + r_h) / 2.0
     # s = math.sqrt(r_w * r_w + r_h * r_h)
-    return s
+    return r_s, r_depth
 
 def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold, cmap_path):
     boxes, sizes, objectness, classes, nums = outputs
-    boxes_ture, sizes_ture, classes_ture, nums_ture = grund_truths
+    boxes_ture, sizes_ture, distances_ture, classes_ture, nums_ture = grund_truths
     boxes, sizes, objectness, classes, nums = boxes[0].numpy(), sizes[0].numpy() , objectness[0].numpy(), classes[0].numpy(), nums[0]
     TP , FP = 0, 0
     size_errors = []
+    distance_errors = []
     for i in range(nums):
         max_iou = 0
         index = -1
@@ -289,13 +294,17 @@ def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold, cm
                 predit = size_normalize_revert(sizes[i])
                 ground_trueth = size_normalize_revert(sizes_ture[index])
                 cmap = cv2.imread(cmap_path)
-                predit = calculate_size_by_distance(cmap, sizes_ture[index], boxes[i])
-                size_ralative_error = abs(predit - ground_trueth) / ground_trueth
+                predit_size, predict_distance = calculate_size_by_distance(cmap, boxes[i])
+                size_ralative_error = abs(predit_size - ground_trueth) / ground_trueth
+                distance_ralative_error = abs(predict_distance - distances_ture[index]) / distances_ture[index]
                 # logging.info('iou = {}  boxes_pre = {} boxes_ture = {}'.format(max_iou, boxes[i],boxes_ture[index]))
                 logging.info('size_pre = {} size_ture = {} size_ralative_error = {}'.format(predit ,ground_trueth, size_ralative_error))
+                logging.info('distance_pre = {} distance_ture = {} distance_ralative_error = {}'.format(predict_distance ,distances_ture[index], distance_ralative_error))
             else:
                 size_ralative_error = 1.0
+                distance_ralative_error = 1.0
             size_errors.append(size_ralative_error)
+            distance_errors.append(distance_ralative_error)
     are = 0
     if len(size_errors) != 0:
         are = sum(size_errors)/ len(size_errors)
@@ -303,7 +312,7 @@ def yolo_extend_evaluate(outputs, grund_truths, has_size_label, iou_trethold, cm
     FN = (nums_ture - TP)
     if FN < 0:
         FN =  -FN
-    return TP, FP, FN, size_errors
+    return TP, FP, FN, size_errors, distance_errors
 
 def save_loss_plot(train_loss = [], val_loss = [], precision = [], recall = [],are = [] ,save_path = './loss.png'):
     fig, ax1 = plt.subplots()

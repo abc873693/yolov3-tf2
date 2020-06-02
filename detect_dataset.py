@@ -17,16 +17,16 @@ flags.DEFINE_enum('model', 'yolov3-tiny', ['yolov3', 'yolov3-tiny', 'single-outp
 flags.DEFINE_boolean('map', True, 'calculate')
 flags.DEFINE_float('iou_trethold', 0.5, 'iou_trethold')
 flags.DEFINE_integer('size', 416, 'resize images to')
-flags.DEFINE_integer('channels', 4, 'resize images to')
-flags.DEFINE_string('experiment', '20200513_1', 'path to dataset')
-flags.DEFINE_string('dataset', 'dataset/shrimp_v7/cfg/valid.txt', 'path to dataset')
+flags.DEFINE_integer('channels', 3, 'resize images to')
+flags.DEFINE_string('experiment', '20200423_6', 'path to dataset')
+flags.DEFINE_string('dataset', 'dataset/microfield_monocular_size_v2/416X416/cfg/test.txt', 'path to dataset')
 flags.DEFINE_boolean('save', True, 'save results')
 # flags.DEFINE_string('output_path', 'output/', 'path to output path')
 flags.DEFINE_integer('num_classes', 1, 'number of classes in the model')
 
 
 def main(_argv):
-    os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
     if len(physical_devices) > 0:
         tf.config.experimental.set_memory_growth(physical_devices[0], True)
@@ -62,6 +62,7 @@ def main(_argv):
     label_count = 0
 
     REs = []
+    DREs = []
 
     TP_total, FP_total, FN_total = 0, 0, 0
 
@@ -142,23 +143,28 @@ def main(_argv):
 
                         if has_size_label:
                             size_ture = labels[: , 5]
+                            distance_ture = labels[: , 6]
                         outputs = (boxes, sizes , scores, classes, nums)
-                        grund_truth = (boxes_ture, size_ture, classes_true, labels_nums)
+                        grund_truth = (boxes_ture, size_ture, distance_ture, classes_true, labels_nums)
                         if FLAGS.save and has_size_label:
                             img = draw_gt(img, (boxes_ture, size_ture , classes_true, labels_nums), class_names)
                             cv2.imwrite(output_path , img)
                         cmap_path = image_path.replace(file_type,'.png')
                         cmap_path = cmap_path.replace('test', 'cmap')
                         cmap_path = cmap_path.replace('valid', 'cmap')
-                        TP, FP, FN, RE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold, cmap_path = cmap_path)
+                        TP, FP, FN, RE, DRE = yolo_extend_evaluate(outputs , grund_truth ,has_size_label , FLAGS.iou_trethold, cmap_path = cmap_path)
                         TP_total += TP
                         FP_total += FP
                         FN_total += FN
                         REs.extend(RE)
+                        DREs.extend(DRE)
 
     are = 1.0
+    adre = 1.0
     if len(REs) != 0:
         are = sum(REs) / len(REs)
+    if len(DREs) != 0:
+        adre = sum(DREs) / len(DREs)
     if((TP_total + FP_total) != 0):
         precision = TP_total / (TP_total + FP_total)
     else :
@@ -170,7 +176,7 @@ def main(_argv):
     results_text = open('records.txt', "a")
     results_text.write('{},{},{},{:.2f}%,{:.2f}%,{:.2f}%\n'.format(TP_total, FP_total, FN_total, precision * 100.0, recall * 100.0, are * 100.0))
     logging.info('TP = {} FP = {} FN = {}'.format(TP_total, FP_total, FN_total))
-    logging.info('precision = {:.2f} recall = {:.2f}, size average ralative error = {:.2f}'.format(precision, recall, are * 100.0))
+    logging.info('precision = {:.2f} recall = {:.2f}, size average ralative error = {:.2f}, distance average ralative error = {:.2f}'.format(precision, recall, are * 100.0, adre * 100.0))
     results_text.close()
 
 if __name__ == '__main__':

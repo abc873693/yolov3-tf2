@@ -1,8 +1,8 @@
 
 #declare -a experitentDir=("20200326_1" "20200326_2" "20200326_3" "20200408_1" "20200408_2" "20200408_3" "20200409_2" "20200410_1" "20200410_2" "20200410_3" "20200410_4")
-declare -a experitentDirs=("20200525_4" "20200525_5" "20200525_6")
+declare -a experitentDirs=("20200423_6")
 #declare -a dataset=("brown128" "green859" "thickBrown1227" "thinGreen1068")
-declare -a dataset=("dataset/microfield_monocular_v2_depth/416X416/cfg/test.txt" "dataset/microfield_monocular_v2_depth/416X416/cfg/valid.txt" "dataset/shrimp_v7/cfg/test.txt")
+declare -a dataset=("dataset/microfield_monocular_size_v2/416X416/cfg/valid.txt" "dataset/microfield_monocular_size_v2/416X416/cfg/test.txt")
 
 weightName=best
 
