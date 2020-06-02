@@ -28,9 +28,9 @@ import os
 flags.DEFINE_string('dataset', './data/mm_v2_depth_crop/train.tfrecord', 'path to dataset')
 flags.DEFINE_string('val_dataset', './data/mm_v2_depth_crop/valid.tfrecord', 'path to validation dataset')
 flags.DEFINE_integer('dataset_image_size', 104, 'image size')
-flags.DEFINE_string('test_dataset_path', './data/microfield_monocular_v2_depth_test/', 'path to test dataset')
-flags.DEFINE_enum('model', 'single-output', ['yolov3', 'yolov3-tiny', 'single-output'] , 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('name', '20200515_1',
+flags.DEFINE_string('test_dataset_path', 'dataset/mm_v2_depth_crop/test/', 'path to test dataset')
+flags.DEFINE_enum('model', 'yolov3-tiny', ['yolov3', 'yolov3-tiny', 'single-output'] , 'yolov3 or yolov3-tiny')
+flags.DEFINE_string('name', '20200525_9',
                     'path to weights name')
 flags.DEFINE_string('weights', './checkpoints/20200417_3/yolov3_train_best.tf',
                     'path to weights file')
@@ -40,7 +40,7 @@ flags.DEFINE_enum('mode', 'eager_tf', ['fit', 'eager_fit', 'eager_tf'],
                   'eager_fit: model.fit(run_eagerly=True), '
                   'eager_tf: custom GradientTape')
 flags.DEFINE_enum('transfer', 'none',
-                  ['none', 'darknet', 'no_output', 'frozen', 'fine_tune'],
+                  ['none', 'darknet', 'no_output', 'frozen', 'fine_tune', 'fine_tune_3'],
                   'none: Training from scratch, '
                   'darknet: Transfer darknet, '
                   'no_output: Transfer all but output, '
@@ -115,15 +115,15 @@ def main(_argv):
         # Configure the model for transfer learning
     if FLAGS.model == 'single-output' or FLAGS.transfer == 'none':
         pass  # Nothing to do
-    elif FLAGS.transfer in ['darknet', 'no_output']:
+    elif FLAGS.transfer in ['darknet', 'no_output', 'fine_tune_3']:
         # Darknet transfer is a special case that works
         # with incompatible number of classes
 
         # reset top layers
-        if FLAGS.tiny:
+        if FLAGS.model == 'yolov3-tiny':
             model_pretrained = YoloV3Tiny(
-                FLAGS.size, training=True, channels=FLAGS.channels, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
-        else:
+                FLAGS.size, training=True, channels=3, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+        elif FLAGS.model == 'yolov3':
             model_pretrained = YoloV3(
                 FLAGS.size, training=True, channels=FLAGS.channels, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
         model_pretrained.load_weights(FLAGS.weights)
@@ -139,7 +139,13 @@ def main(_argv):
                     l.set_weights(model_pretrained.get_layer(
                         l.name).get_weights())
                     freeze_all(l)
-
+        elif FLAGS.transfer == 'fine_tune_3':
+            for l in model.layers:
+                if l.name.startswith('input'):
+                    l.set_weights(model_pretrained.get_layer(
+                        l.name).get_weights())
+            darknet = model.get_layer('yolo_darknet')
+            freeze_all(darknet)
     else:
         # All other transfer require matching classes
         model.load_weights(FLAGS.weights)
@@ -161,6 +167,8 @@ def main(_argv):
 
     # optimizer = tfa.optimizers.SGDW(
     #     learning_rate=lr, weight_decay=wd)
+
+    model.summary()
 
     if FLAGS.model == 'single-output':
         loss = SingleSizeLoss()
@@ -294,7 +302,7 @@ def main(_argv):
 
             avg_loss.reset_states()
             avg_val_loss.reset_states()
-            if epoch % 10 == 0:
+            if epoch % 50 == 0:
                 model.save_weights(
                     '{}yolov3_train_{}.tf'.format(weight_base_dir, epoch))
             save_loss_plot(train_loss = loss_records,val_loss = loss_val_records,precision=precision_records, recall = recall_records, are = relative_error_records, save_path='{}loss.png'.format(weight_base_dir))
